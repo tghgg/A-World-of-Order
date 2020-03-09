@@ -1,0 +1,797 @@
+[gd_scene load_steps=26 format=2]
+
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=1]
+[ext_resource path="res://src/Scripts/NewScene.gd" type="Script" id=2]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=6]
+[ext_resource path="res://assets/textures/levels/final/day1/Main path.png.png" type="Texture" id=7]
+[ext_resource path="res://assets/textures/levels/final/day1/headge.png" type="Texture" id=8]
+[ext_resource path="res://assets/textures/levels/final/day1/lampost.png" type="Texture" id=9]
+[ext_resource path="res://assets/textures/levels/final/day1/tree 1.png" type="Texture" id=10]
+[ext_resource path="res://src/Scripts/Layer.gd" type="Script" id=11]
+[ext_resource path="res://assets/textures/levels/final/day1/main path.png" type="Texture" id=12]
+[ext_resource path="res://src/Templates/Objects/Tree.tscn" type="PackedScene" id=13]
+[ext_resource path="res://src/Templates/Objects/Lamp.tscn" type="PackedScene" id=14]
+[ext_resource path="res://src/Templates/InteractableArea.tscn" type="PackedScene" id=15]
+[ext_resource path="res://src/Templates/Objects/SignTexts.tscn" type="PackedScene" id=16]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 346.784, 63.3496 )
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 344.365, 42.8159 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 344.365, 42.8159 )
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 346.784, 91.3719 )
+
+[sub_resource type="RectangleShape2D" id=5]
+extents = Vector2( 344.365, 42.8159 )
+
+[sub_resource type="RectangleShape2D" id=6]
+extents = Vector2( 44.3336, 58.813 )
+
+[sub_resource type="RectangleShape2D" id=7]
+extents = Vector2( 212.837, 153.448 )
+
+[sub_resource type="RectangleShape2D" id=8]
+extents = Vector2( 41.4747, 63.2808 )
+
+[sub_resource type="GDScript" id=9]
+script/source = "extends KinematicBody2D
+
+# Export key variables for easy editing 
+export (Color) var color # COLOR OF THE TEXT
+
+export (float, 0.0, 1.9) var voice_pitch # HOW HIGH / LOW THE VOICE IS
+
+export (String, FILE) var interaction_script # A JSON DIALOGUE FILE
+
+# Initialize variables
+# Default scale = 35
+const SCALE := 50
+const ACCELERATION := 200 * SCALE
+const MAX_SPEED := 500 * SCALE
+
+onready var motion := Vector2(0, 0)
+onready var player_animation := $Sprite
+# Store the direction the player's hearding towards to set the animation correctly
+onready var current_direction := 0
+onready var area := $InteractableArea
+onready var UI := $Camera2D/UI
+onready var shake_amount := 3.0
+# Initializeer
+# Connect the interactable area's signals to interaction handlers
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = $Camera2D
+	# Set camera limit according to level's size
+	#$Camera2D.limit_right = get_node(\"../../BG/Map\").get_texture().get_size().x * get_node(\"../../BG/Map\").scale.x
+	#$Camera2D.limit_bottom = get_node(\"../../BG/Map\").get_texture().get_size().y * get_node(\"../../BG/Map\").scale.y
+# warning-ignore:return_value_discarded
+	area.connect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+# warning-ignore:return_value_discarded
+	area.connect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+# warning-ignore:return_value_discarded
+	self.connect(\"tree_exited\", self, \"_on_tree_exited\")
+
+
+# Dialogue handler
+func talk() -> void:
+#	print(\"talking to \" + self.name)
+	if interaction_script:
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else:
+		print(\"No dialogue found for the player\")
+
+
+# Interaction with NPCs and objects handler
+func _on_InteractableArea_entered(body: Area2D) -> void:
+	global.set_current_body(body)
+	# Show talk bubble if body can be talked to
+	if body.get_parent() as KinematicBody2D:
+		if body.get_parent().interaction_script:
+			$TalkBubble.play_animation()
+func _on_InteractableArea_exited(_body: Area2D) -> void:
+	global.set_current_body(null)
+	# Hide talk bubble
+	if $TalkBubble.modulate.a != 0:
+		$TalkBubble.stop_animation()
+
+# Input handler
+func _physics_process(delta) -> void:
+	# Shake the camera
+#	if global.shake_camera:
+#		$Camera2D.set_offset(Vector2( 
+#			rand_range(-1.0, 1.0) * shake_amount, 
+#			rand_range(-1.0, 1.0) * shake_amount 
+#		))
+#	else:
+#		$Camera2D.set_offset(Vector2(0, 0))
+		
+	# Open game settings when ESC is pressed
+	if Input.is_action_just_pressed(\"open_settings\"):
+		if not UI.get_node(\"Settings/Popup\").visible:
+			# Freeze player movement
+			if global.get_can_talk():
+				global.set_can_talk(false)
+				UI.popup_element(\"Settings\")
+		else:
+			if not global.get_can_talk():
+				global.set_can_talk(true, false)
+				UI.hide_element(\"Settings\")
+	
+	# Check whether player is in dialogue
+	# If in dialogue then freeze all movement until dialogue is finished
+	if global.get_can_talk():
+		# Interaction Input
+		if Input.is_action_just_pressed(\"interact\") and global.get_current_body() != null:
+			if global.get_current_body().get_parent() as KinematicBody2D:
+				print(\"Talk to \" + global.get_current_body().get_parent().name)
+				# get the parent of the area2d which is the Kinematic2D node and use the talk() method
+				global.get_current_body().get_parent().talk()
+		# Sideway motion
+		if Input.is_action_pressed(\"ui_right\"):
+			motion.x = min(motion.x + ACCELERATION, MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = true
+			current_direction = 2
+		elif Input.is_action_pressed(\"ui_left\"):
+			motion.x = max(motion.x - ACCELERATION, -MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = false
+			current_direction = 2
+		else:
+			# TODO: Fix jittering after stopping
+			motion.x = lerp(motion.x, 0.0, 1)
+		# check for top-down movement 
+		if global.get_top_down(): 
+			if Input.is_action_pressed(\"ui_up\"):
+				motion.y = max(motion.y - ACCELERATION, -MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = -1
+			elif Input.is_action_pressed(\"ui_down\"):
+				motion.y = min(motion.y + ACCELERATION, MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = 1
+			else:
+				#motion.x = lerp(motion.x, 0, 0.2)   adds a bit of inertia when stopped
+				motion.y = 0
+		# Play idle animation based on current direction if standing still
+		# 0 is idle
+		# 1 is forward
+		# -1 is backward
+		# 2 is sideways
+		if motion == Vector2(0, 0):
+			match(current_direction):
+				-1:
+					player_animation.play(\"idle_front\")
+				0:
+					player_animation.play(\"idle_front\")
+				1:
+					player_animation.play(\"idle_front\")
+				2:
+					player_animation.play(\"idle_front\")
+	else:
+		motion = Vector2(0, 0)
+		match(current_direction):
+			-1:
+				player_animation.play(\"idle_front\")
+			0:
+				player_animation.play(\"idle_front\")
+			1:
+				player_animation.play(\"idle_front\")
+			2:
+				player_animation.play(\"idle_front\")
+		# Advance the dialog when dialogue is happening
+		if Input.is_action_just_pressed(\"dialogue_next\"):
+			# Check if the settings menu is open
+			if UI.get_node(\"Settings/Popup\").visible:
+				return
+			# if menu hidden then it means that there is a dialogue happening
+			MSG.next()
+
+	# move with 'motion' speed, the up direction is y=1, and stop on slopes
+# warning-ignore:return_value_discarded
+	move_and_slide(motion * delta)
+
+# Clear signal connections when the scene ends
+func _on_tree_exited() -> void:
+	area.disconnect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+	area.disconnect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+
+
+"
+
+[node name="MainPathNoon" type="Node2D" groups=[
+"level_root",
+]]
+script = ExtResource( 2 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 12 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Map2" type="Sprite" parent="BG"]
+position = Vector2( 0.902466, 1080.78 )
+texture = ExtResource( 12 )
+centered = false
+
+[node name="Map3" type="Sprite" parent="BG"]
+position = Vector2( -2160.62, 601.677 )
+texture = ExtResource( 7 )
+centered = false
+
+[node name="Bounds" type="StaticBody2D" parent="BG"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Bounds"]
+polygon = PoolVector2Array( -200.806, 6701.61, 6030.61, 6676.39, 5921.29, 6.64367, 5787.4, 23.3807, 5784.04, 2409.91, 5778.33, 6474.56, 38.8642, 6474.56, 29.532, 4919.86, 11.7534, 1957.99, 0, 0, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="Hedges" type="Node2D" parent="BG"]
+
+[node name="Hedge2" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 351.632, 1747.82 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge2"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge2"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge2"]
+position = Vector2( -15.9999, 1 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge2/LayerSystem"]
+shape = SubResource( 2 )
+
+[node name="Hedge3" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 351.632, 1509.82 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge3"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge3"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge3"]
+position = Vector2( -15.9999, 1 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge3/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Hedge4" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 1587.98, 1692.18 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge4"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge4"]
+position = Vector2( -11.9964, 43.2607 )
+shape = SubResource( 4 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge4"]
+position = Vector2( -15.9999, 1 )
+monitoring = false
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge4/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Hedge5" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 1587.98, 1982.72 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge5"]
+z_index = 10
+z_as_relative = false
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge5"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge5"]
+position = Vector2( -15.9999, 1 )
+monitoring = false
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge5/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Hedge9" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 351.632, 659.012 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge9"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge9"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge9"]
+position = Vector2( -15.9999, 1 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge9/LayerSystem"]
+shape = SubResource( 5 )
+
+[node name="Hedge8" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 351.632, 421.016 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge8"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge8"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge8"]
+position = Vector2( -15.9999, 1 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge8/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Hedge7" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 1587.98, 603.377 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge7"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge7"]
+position = Vector2( -11.9964, 43.2607 )
+shape = SubResource( 4 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge7"]
+position = Vector2( -15.9999, 1 )
+monitoring = false
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge7/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Hedge6" type="StaticBody2D" parent="BG/Hedges"]
+position = Vector2( 1587.98, 893.918 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Hedges/Hedge6"]
+texture = ExtResource( 8 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Hedges/Hedge6"]
+position = Vector2( -16.4284, 68.7454 )
+shape = SubResource( 1 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Hedges/Hedge6"]
+position = Vector2( -15.9999, 1 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Hedges/Hedge6/LayerSystem"]
+shape = SubResource( 3 )
+
+[node name="Lamps" type="Node2D" parent="BG"]
+
+[node name="Lamp1" type="StaticBody2D" parent="BG/Lamps"]
+position = Vector2( 1229.94, 1901.8 )
+rotation = -3.14159
+scale = Vector2( 1, -1 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Lamps/Lamp1"]
+texture = ExtResource( 9 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Lamps/Lamp1"]
+position = Vector2( 63.506, 156.612 )
+shape = SubResource( 6 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Lamps/Lamp1"]
+position = Vector2( -38.1605, -68.8059 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Lamps/Lamp1/LayerSystem"]
+position = Vector2( 11.0803, -52.0773 )
+shape = SubResource( 7 )
+
+[node name="Lamp3" type="StaticBody2D" parent="BG/Lamps"]
+position = Vector2( 1231.99, 508.648 )
+rotation = -3.14159
+scale = Vector2( 1, -1 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Lamps/Lamp3"]
+texture = ExtResource( 9 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Lamps/Lamp3"]
+position = Vector2( 62.6583, 141.066 )
+shape = SubResource( 6 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Lamps/Lamp3"]
+position = Vector2( -38.1605, -68.8059 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Lamps/Lamp3/LayerSystem"]
+position = Vector2( 11.0803, -52.0773 )
+shape = SubResource( 7 )
+
+[node name="Lamp" parent="BG/Lamps" instance=ExtResource( 14 )]
+
+[node name="Lamp2" type="StaticBody2D" parent="BG/Lamps"]
+position = Vector2( 672.596, 322.281 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Lamps/Lamp2"]
+texture = ExtResource( 9 )
+
+[node name="q" type="CollisionShape2D" parent="BG/Lamps/Lamp2"]
+position = Vector2( 61.606, 142.008 )
+shape = SubResource( 6 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Lamps/Lamp2"]
+position = Vector2( -38.1605, -68.8059 )
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Lamps/Lamp2/LayerSystem"]
+position = Vector2( 11.0803, -52.0773 )
+shape = SubResource( 7 )
+
+[node name="ExitNodes" type="Node2D" parent="BG"]
+
+[node name="ExitNode" parent="BG/ExitNodes" instance=ExtResource( 1 )]
+position = Vector2( 12.6144, 1669.28 )
+rotation = -1.51655
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/ApartmentHallway.tscn"
+
+[node name="ExitNode5" parent="BG/ExitNodes" instance=ExtResource( 1 )]
+position = Vector2( 941.519, 2188.13 )
+rotation = -3.07243
+scale = Vector2( 2.69893, 3.47165 )
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/ParkPath.tscn"
+
+[node name="t" parent="BG/ExitNodes" instance=ExtResource( 1 )]
+position = Vector2( 961.831, 11.0752 )
+rotation = -3.14159
+scale = Vector2( 2.30168, 0.965071 )
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/Square.tscn"
+
+[node name="ExitNode3" parent="BG/ExitNodes" instance=ExtResource( 1 )]
+position = Vector2( 1908.86, 793.255 )
+rotation = -1.51655
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/ChurchNoon.tscn"
+
+[node name="ExitNode4" parent="BG/ExitNodes" instance=ExtResource( 1 )]
+position = Vector2( 1905.26, 1874.76 )
+rotation = -1.51655
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/IndustrialGate.tscn"
+
+[node name="InteractableArea" parent="BG" instance=ExtResource( 15 )]
+position = Vector2( -77.6595, 568.833 )
+scale = Vector2( 1.99004, 0.235479 )
+interaction_script = "res://assets/dialogues/jam/day1/VillasBlocked2.json"
+
+[node name="Trees" type="Node2D" parent="BG"]
+
+[node name="Tree" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1171.36, 1201.53 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree2" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 636.984, 2142.84 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree2"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree2"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree2"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree2/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree4" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1835, 2078.24 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree4"]
+z_index = 100
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree4"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree4"]
+monitoring = false
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree4/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree13" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1835, 2078.24 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree13"]
+z_index = 100
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree13"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree13"]
+monitoring = false
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree13/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree3" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 177.631, 2311.98 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree3"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree3"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree3"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree3/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree5" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 504.652, 1041.32 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree5"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree5"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree5"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree5/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree9" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1654.66, 219.37 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree9"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree9"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree9"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree9/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree10" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1315.78, 28.3032 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree10"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree10"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree10"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree10/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree11" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 183.805, 89.5887 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree11"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree11"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree11"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree11/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree12" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 522.677, -72.6375 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree12"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree12"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree12"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree12/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree6" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 179.028, 1136.46 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree6"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree6"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree6"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree6/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree7" parent="BG/Trees" instance=ExtResource( 13 )]
+
+[node name="Tree8" type="StaticBody2D" parent="BG/Trees"]
+position = Vector2( 1460.92, 1377.22 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Trees/Tree8"]
+texture = ExtResource( 10 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Trees/Tree8"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 8 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Trees/Tree8"]
+monitorable = false
+script = ExtResource( 11 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Trees/Tree8/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="SignTexts" parent="BG" instance=ExtResource( 16 )]
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 6 )]
+position = Vector2( 139.475, 567.745 )
+script = SubResource( 9 )
+color = Color( 0, 0, 0, 1 )
+
+[node name="Camera2D" parent="Characters/Evan" index="0"]
+limit_right = 1920
+limit_bottom = 2160
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 4 )]
+
+[node name="Transition" parent="." instance=ExtResource( 3 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 5 )]
+color = Color( 0.980392, 1, 0.380392, 1 )
+
+[editable path="Characters/Evan"]

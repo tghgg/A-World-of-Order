@@ -1,0 +1,236 @@
+[gd_scene load_steps=20 format=2]
+
+[ext_resource path="res://assets/textures/levels/final/day1/industry.png" type="Texture" id=1]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=2]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/Scripts/NewScene.gd" type="Script" id=4]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=7]
+[ext_resource path="res://src/Templates/ObjectWithDialogue.tscn" type="PackedScene" id=8]
+[ext_resource path="res://assets/textures/levels/final/day1/tree 1.png" type="Texture" id=9]
+[ext_resource path="res://src/Scripts/Layer.gd" type="Script" id=10]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 1371.52, 271.423 )
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 2622.9, 271.423 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 191.579, 266.165 )
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 191.579, 271.423 )
+
+[sub_resource type="RectangleShape2D" id=5]
+extents = Vector2( 191.579, 1289.68 )
+
+[sub_resource type="GDScript" id=6]
+script/source = "extends \"res://src/Scripts/NPC.gd\"
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+		# Some space to add dynamic events here
+		yield(global, 'dialogue_finished')
+		global.temp_variables[\"has_delivery\"] = true
+		queue_free()
+	else: 
+		print('No dialogue available for the character')
+"
+
+[sub_resource type="GDScript" id=7]
+script/source = "extends \"res://src/Scripts/NPC.gd\"
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+"
+
+[sub_resource type="Environment" id=8]
+background_mode = 4
+glow_bloom = 0.06
+
+[sub_resource type="RectangleShape2D" id=9]
+extents = Vector2( 41.4747, 63.2808 )
+
+[node name="IndustrialGate" type="Node2D" groups=[
+"level_root",
+]]
+script = ExtResource( 4 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 1 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 5787.4, 23.3807, 5779.03, 3195.05, 0, 3255.48, 0, 0, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 1253.73 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 1346.33, 1929.91 )
+shape = SubResource( 1 )
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 1982.33, 3034.97 )
+shape = SubResource( 2 )
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2506.22, 1799.69 )
+shape = SubResource( 3 )
+
+[node name="CollisionShape2D5" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 1354.28, 1406.49 )
+shape = SubResource( 4 )
+
+[node name="CollisionShape2D4" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 4376.32, 2544.03 )
+shape = SubResource( 5 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 7 )]
+position = Vector2( -7.90288, 839.797 )
+rotation = -1.57079
+scale = Vector2( 0.966465, 1.32472 )
+exit_scene = "res://src/Scenes/Jam/Day1/MainPath.tscn"
+
+[node name="StatusBoard" parent="BG/Map" instance=ExtResource( 8 )]
+position = Vector2( 612.974, 153.936 )
+interaction_script = "res://assets/dialogues/jam/day1/IndustryGateStatus1.json"
+
+[node name="NewspaperStack" parent="BG/Map" instance=ExtResource( 8 )]
+position = Vector2( 819.301, 329.737 )
+scale = Vector2( 0.582302, 0.506569 )
+script = SubResource( 6 )
+interaction_script = "res://assets/dialogues/jam/day1/IndustryGateBox1.json"
+
+[node name="NewspaperStack2" parent="BG/Map" instance=ExtResource( 8 )]
+position = Vector2( 1215.48, 218.567 )
+scale = Vector2( 1.25863, 1.39235 )
+script = SubResource( 7 )
+interaction_script = "res://assets/dialogues/jam/day1/IndustryGate2.json"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 8 )
+
+[node name="Tree7" type="StaticBody2D" parent="BG"]
+position = Vector2( 1286.37, 1109.18 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree7"]
+z_index = 10
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree7"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 9 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree7"]
+monitorable = false
+script = ExtResource( 10 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree7/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree8" type="StaticBody2D" parent="BG"]
+position = Vector2( 857.061, 1000.53 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree8"]
+z_index = 10
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree8"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 9 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree8"]
+monitorable = false
+script = ExtResource( 10 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree8/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree9" type="StaticBody2D" parent="BG"]
+position = Vector2( 226.354, 1228.43 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree9"]
+z_index = 10
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree9"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 9 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree9"]
+monitorable = false
+script = ExtResource( 10 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree9/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree10" type="StaticBody2D" parent="BG"]
+position = Vector2( 422.456, 1048.23 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree10"]
+z_index = 10
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree10"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 9 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree10"]
+monitorable = false
+script = ExtResource( 10 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree10/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 3 )]
+position = Vector2( 140.551, 780.375 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 6 )]
+
+[node name="Transition" parent="." instance=ExtResource( 5 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 2 )]
+visible = false
+color = Color( 0.0666667, 0.117647, 0.298039, 1 )
+
+[editable path="Characters/Evan"]

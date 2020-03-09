@@ -1,0 +1,127 @@
+[gd_scene load_steps=14 format=2]
+
+[ext_resource path="res://assets/textures/levels/testing/evan_house.png" type="Texture" id=1]
+[ext_resource path="res://src/Scripts/NewScene.gd" type="Script" id=2]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/Templates/Effects/Moonlight.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/Light.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=7]
+[ext_resource path="res://assets/textures/levels/testing/evan_house_overlay_door.png" type="Texture" id=8]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=10]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends \"res://src/Scripts/NPC.gd\"
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+		yield(global, \"dialogue_finished\")
+		get_parent().get_parent().change_scene(\"res://src/Scenes/testing/Intro/Day2/Day2.tscn\")
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+"
+
+[sub_resource type="CapsuleShape2D" id=2]
+radius = 18.7297
+height = 68.9027
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 98.142, 144.04 )
+
+[node name="EvanHouse" type="Node2D" groups=[
+"level_root",
+]]
+script = ExtResource( 2 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 1 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 4695.82, 324.456, 4696.3, 1562.11, 4234.69, 1660.88, 4266.35, 2393.45, 4704.98, 2388.92, 4687.87, 2542.53, 3283.34, 2558.14, 3283.34, 3230.21, 2827.5, 3224.36, 2827.5, 2558.14, 1126.23, 2558.43, 1094.43, 316.506, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 902.149 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 7 )]
+position = Vector2( 1015.34, 1060.76 )
+exit_scene = "res://src/Scenes/testing/Intro/Day2/Neighborhood.tscn"
+
+[node name="Door" type="Sprite" parent="BG"]
+z_index = 100
+z_as_relative = false
+texture = ExtResource( 8 )
+centered = false
+
+[node name="Light2D" parent="BG" instance=ExtResource( 5 )]
+visible = false
+position = Vector2( 935.108, 166.433 )
+color = Color( 0.616953, 0.643555, 0.326805, 1 )
+
+[node name="Sprite" parent="BG/Light2D" index="0"]
+visible = false
+
+[node name="Moonlight" parent="BG" instance=ExtResource( 4 )]
+position = Vector2( 992.832, 385.01 )
+scale = Vector2( 0.720765, 0.833017 )
+texture_scale = 3.0
+color = Color( 0, 0, 0, 1 )
+
+[node name="Bed" type="KinematicBody2D" parent="BG"]
+position = Vector2( 548.214, 423.077 )
+z_index = 1
+script = SubResource( 1 )
+__meta__ = {
+"_edit_group_": true
+}
+interaction_script = "res://assets/dialogues/intro/Sleep.json"
+
+[node name="InteractableArea" type="Area2D" parent="BG/Bed"]
+scale = Vector2( 2.73996, 2.46791 )
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Bed/InteractableArea"]
+position = Vector2( 0, 9.45209 )
+scale = Vector2( 2.41862, -1.36485 )
+shape = SubResource( 2 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Bed"]
+position = Vector2( -2.7207, 27.2074 )
+shape = SubResource( 3 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 9 )]
+position = Vector2( 1019.35, 806.684 )
+
+[node name="Sprite" parent="Characters/Evan" index="2"]
+frame = 1
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 6 )]
+
+[node name="Transition" parent="." instance=ExtResource( 3 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 10 )]
+color = Color( 0.294118, 0.309804, 0.305882, 1 )
+
+[editable path="BG/Light2D"]
+
+[editable path="Characters/Evan"]

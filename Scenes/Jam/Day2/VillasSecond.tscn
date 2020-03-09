@@ -1,0 +1,794 @@
+[gd_scene load_steps=39 format=2]
+
+[ext_resource path="res://assets/characters/player/sprite.tres" type="SpriteFrames" id=1]
+[ext_resource path="res://addons/MSG_System/fonts/font_normal.tres" type="DynamicFont" id=2]
+[ext_resource path="res://addons/MSG_System/fonts/open_sans/OpenSans-Regular.ttf" type="DynamicFontData" id=3]
+[ext_resource path="res://assets/textures/dialog_box.png" type="Texture" id=4]
+[ext_resource path="res://assets/textures/levels/final/day1/villas.png" type="Texture" id=5]
+[ext_resource path="res://particle.png" type="Texture" id=6]
+[ext_resource path="res://assets/textures/light/player_light.png" type="Texture" id=7]
+[ext_resource path="res://assets/characters/player/frame0000.png" type="Texture" id=8]
+[ext_resource path="res://src/Scripts/Control.gd" type="Script" id=9]
+[ext_resource path="res://src/Scripts/TalkBubble.gd" type="Script" id=10]
+[ext_resource path="res://icon_cursed.png" type="Texture" id=11]
+[ext_resource path="res://src/Templates/Future-Uses/VolumeSlider.tscn" type="PackedScene" id=12]
+[ext_resource path="res://icon.png" type="Texture" id=13]
+[ext_resource path="res://assets/characters/player/frame0002.png" type="Texture" id=14]
+[ext_resource path="res://assets/characters/player/frame0001.png" type="Texture" id=15]
+[ext_resource path="res://assets/characters/player/body_shape.tres" type="Shape2D" id=16]
+[ext_resource path="res://assets/characters/player/face.tres" type="SpriteFrames" id=17]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=18]
+[ext_resource path="res://src/Templates/Character.tscn" type="PackedScene" id=19]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=20]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=21]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=22]
+[ext_resource path="res://src/Templates/InteractableArea.tscn" type="PackedScene" id=23]
+
+[sub_resource type="GDScript" id=18]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if $Effects.has_node(\"Particles\"): 
+		$Effects/Particles.emit_all()
+	
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		
+		if save_data[self.name].has(\"dialogue_finished\"):
+			if save_data[self.name][\"dialogue_finished\"]:
+				global.set_can_talk(true)
+		else:
+			global.set_can_talk(true)
+	
+		# Set the position of the player according to the last time 
+		# the player was in this scene
+		if save_data[self.name].has(\"exit_point\"):
+			# Set x and y separately because Vector2 is a Godot thing, not a JSON thing
+			player.global_position.x = save_data[self.name][\"exit_point\"][\"position_x\"]
+			player.global_position.y = save_data[self.name][\"exit_point\"][\"position_y\"]
+			# Disable the exit node the player used previously
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = false
+			yield(get_tree().create_timer(2.5), \"timeout\")
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = true
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename,
+		})
+		# Create the save entry for the level
+		# Stuff to do
+		global.set_can_talk(true)
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="GDScript" id=34]
+script/source = "extends Area2D
+
+export (String, FILE) var interaction_script
+
+onready var root_node := self.get_parent().get_parent().get_parent()
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+	
+func _on_InteractableArea_area_entered(area: Area2D) -> void:
+	if area.get_parent() as KinematicBody2D:
+		if area.get_parent().name == global.current_player_name:
+			talk()
+			yield(global, 'dialogue_finished')
+			if global.temp_variables.has(\"bottles_delivered\"):
+				global.get_player().increment_counter()
+				queue_free()
+"
+
+[sub_resource type="GDScript" id=33]
+script/source = "extends Area2D
+
+export (String, FILE) var exit_scene
+
+export (String, FILE) var interaction_script
+
+# Connect signals 
+func _ready() -> void:
+	self.connect(\"body_entered\", self, \"_on_body_entered\")
+
+# Dialogue handler
+func talk() -> void:
+#	print(\"talking to \" + self.name)
+	if interaction_script:
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else:
+		print(\"No dialogue found for the player\")
+
+# Exit function
+func _on_body_entered(body: PhysicsBody2D) -> void:
+	if body as KinematicBody2D and body.name == global.current_player_name:
+		var current_root := body.get_parent().get_parent()
+		# Track the exit points in the save file
+#		global.append_save_data(current_root.name, \"exit_point\", {
+#			\"position_x\": body.position.x,
+#			\"position_y\": body.position.y,
+#			\"exit_node\": self.get_path()
+#		})
+		# Start an exit dialogue if specified
+		if interaction_script:
+			var save_data = global.get_save_data()
+			# Check for the number of newspaper delivered by the player
+			if global.temp_variables[\"bottles_delivered\"] == 4:
+				print(\"Change to Church\")
+				interaction_script = \"res://assets/dialogues/jam/day2/VillasDeliveryFinish.json\"
+				yield(get_tree(), \"idle_frame\")
+				talk()
+				yield(global, \"dialogue_finished\")
+				current_root.change_scene(exit_scene)
+			else:
+				print(\"Not enough newspaper delivered\")
+				talk()
+"
+
+[sub_resource type="GDScript" id=32]
+script/source = "extends KinematicBody2D
+
+# Export key variables for easy editing 
+export (Color) var color # COLOR OF THE TEXT
+
+export (float, 0.0, 1.9) var voice_pitch # HOW HIGH / LOW THE VOICE IS
+
+export (String, FILE) var interaction_script # A JSON DIALOGUE FILE
+
+# Initialize variables
+# Default scale = 35
+const SCALE := 50
+const ACCELERATION := 200 * SCALE
+const MAX_SPEED := 500 * SCALE
+
+onready var motion := Vector2(0, 0)
+onready var player_animation := $Sprite
+# Store the direction the player's hearding towards to set the animation correctly
+onready var current_direction := 0
+onready var area := $InteractableArea
+onready var UI := $Camera2D/UI
+onready var shake_amount := 3.0
+
+# No. delivered
+onready var count = $Camera2D/UI/Panel/Label
+
+# Initializeer
+# Connect the interactable area's signals to interaction handlers
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = $Camera2D
+	# Set camera limit according to level's size
+	$Camera2D.limit_right = get_node(\"../../BG/Map\").get_texture().get_size().x * get_node(\"../../BG/Map\").scale.x
+	$Camera2D.limit_bottom = get_node(\"../../BG/Map\").get_texture().get_size().y * get_node(\"../../BG/Map\").scale.y
+# warning-ignore:return_value_discarded
+	area.connect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+# warning-ignore:return_value_discarded
+	area.connect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+# warning-ignore:return_value_discarded
+	self.connect(\"tree_exited\", self, \"_on_tree_exited\")
+
+	# intialize count
+	if not global.temp_variables.has(\"bottles_delivered\"):
+		global.temp_variables[\"bottles_delivered\"] = 0
+	$Camera2D/UI/Panel/Label.text = \"BOTTLES DELIVERED: %d\" % global.temp_variables[\"bottles_delivered\"]
+
+# Dialogue handler
+func talk() -> void:
+#	print(\"talking to \" + self.name)
+	if interaction_script:
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else:
+		print(\"No dialogue found for the player\")
+
+
+# Interaction with NPCs and objects handler
+func _on_InteractableArea_entered(body: Area2D) -> void:
+	global.set_current_body(body)
+	# Show talk bubble if body can be talked to
+	if body.get_parent() as KinematicBody2D:
+		if body.get_parent().interaction_script:
+			$TalkBubble.play_animation()
+func _on_InteractableArea_exited(_body: Area2D) -> void:
+	global.set_current_body(null)
+	# Hide talk bubble
+	if $TalkBubble.modulate.a != 0:
+		$TalkBubble.stop_animation()
+
+# Input handler
+func _physics_process(delta) -> void:
+	# Shake the camera
+#	if global.shake_camera:
+#		$Camera2D.set_offset(Vector2( 
+#			rand_range(-1.0, 1.0) * shake_amount, 
+#			rand_range(-1.0, 1.0) * shake_amount 
+#		))
+#	else:
+#		$Camera2D.set_offset(Vector2(0, 0))
+		
+	# Open game settings when ESC is pressed
+	if Input.is_action_just_pressed(\"open_settings\"):
+		if not UI.get_node(\"Settings/Popup\").visible:
+			# Freeze player movement
+			if global.get_can_talk():
+				global.set_can_talk(false)
+				UI.popup_element(\"Settings\")
+		else:
+			if not global.get_can_talk():
+				global.set_can_talk(true, false)
+				UI.hide_element(\"Settings\")
+	
+	# Check whether player is in dialogue
+	# If in dialogue then freeze all movement until dialogue is finished
+	if global.get_can_talk():
+		# Interaction Input
+		if Input.is_action_just_pressed(\"interact\") and global.get_current_body() != null:
+			if global.get_current_body().get_parent() as KinematicBody2D:
+				print(\"Talk to \" + global.get_current_body().get_parent().name)
+				# get the parent of the area2d which is the Kinematic2D node and use the talk() method
+				global.get_current_body().get_parent().talk()
+		# Sideway motion
+		if Input.is_action_pressed(\"ui_right\"):
+			motion.x = min(motion.x + ACCELERATION, MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = true
+			current_direction = 2
+		elif Input.is_action_pressed(\"ui_left\"):
+			motion.x = max(motion.x - ACCELERATION, -MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = false
+			current_direction = 2
+		else:
+			# TODO: Fix jittering after stopping
+			motion.x = lerp(motion.x, 0.0, 1)
+		# check for top-down movement 
+		if global.get_top_down(): 
+			if Input.is_action_pressed(\"ui_up\"):
+				motion.y = max(motion.y - ACCELERATION, -MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = -1
+			elif Input.is_action_pressed(\"ui_down\"):
+				motion.y = min(motion.y + ACCELERATION, MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = 1
+			else:
+				#motion.x = lerp(motion.x, 0, 0.2)   adds a bit of inertia when stopped
+				motion.y = 0
+		# Play idle animation based on current direction if standing still
+		# 0 is idle
+		# 1 is forward
+		# -1 is backward
+		# 2 is sideways
+		if motion == Vector2(0, 0):
+			match(current_direction):
+				-1:
+					player_animation.play(\"idle_front\")
+				0:
+					player_animation.play(\"idle_front\")
+				1:
+					player_animation.play(\"idle_front\")
+				2:
+					player_animation.play(\"idle_front\")
+	else:
+		motion = Vector2(0, 0)
+		match(current_direction):
+			-1:
+				player_animation.play(\"idle_front\")
+			0:
+				player_animation.play(\"idle_front\")
+			1:
+				player_animation.play(\"idle_front\")
+			2:
+				player_animation.play(\"idle_front\")
+		# Advance the dialog when dialogue is happening
+		if Input.is_action_just_pressed(\"dialogue_next\"):
+			# Check if the settings menu is open
+			if UI.get_node(\"Settings/Popup\").visible:
+				return
+			# if menu hidden then it means that there is a dialogue happening
+			MSG.next()
+
+	# move with 'motion' speed, the up direction is y=1, and stop on slopes
+# warning-ignore:return_value_discarded
+	move_and_slide(motion * delta)
+
+func increment_counter() -> void:
+	global.temp_variables[\"bottles_delivered\"] += 1
+	if global.temp_variables[\"bottles_delivered\"] == 4:
+		count.text = \"JOB IS DONE\"
+		count.set_anchors_preset(8)
+		$PlayerMovement.play(\"fade_out_counter\")
+	else:
+		count.text = \"BOTTLES DELIVERED: %d\" % global.temp_variables[\"bottles_delivered\"]
+
+# Clear signal connections when the scene ends
+func _on_tree_exited() -> void:
+	area.disconnect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+	area.disconnect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+
+
+"
+
+[sub_resource type="GDScript" id=35]
+script/source = "extends Panel
+
+# Auto-hide
+func _ready() -> void:
+	if is_visible():
+		set_visible(false)
+
+# Popup handlers
+func popup() -> void:
+	set_visible(true)
+
+func hide() -> void:
+	set_visible(false)
+
+"
+
+[sub_resource type="DynamicFontData" id=36]
+font_path = "res://addons/MSG_System/fonts/open_sans/OpenSans-Regular.ttf"
+
+[sub_resource type="DynamicFont" id=37]
+size = 48
+outline_size = 1
+outline_color = Color( 0, 0, 0, 1 )
+use_mipmaps = true
+use_filter = true
+font_data = SubResource( 36 )
+
+[sub_resource type="GDScript" id=38]
+script/source = "extends CheckBox
+
+func _ready() -> void:
+	if OS.window_fullscreen:
+		pressed = true
+	else:
+		pressed = false
+
+func _on_CheckBox_toggled(button_pressed: bool) -> void:
+	if button_pressed:
+		OS.window_fullscreen = true
+	else:
+		OS.window_fullscreen = false
+"
+
+[sub_resource type="StyleBoxLine" id=39]
+color = Color( 1, 1, 1, 1 )
+
+[sub_resource type="GDScript" id=40]
+script/source = "extends Button
+
+func close_settings() -> void:
+	if not global.get_can_talk():
+		global.set_can_talk(true, false)
+		get_parent().get_parent().get_parent().get_parent().get_parent().hide_element(\"Settings\")
+"
+
+[sub_resource type="DynamicFont" id=41]
+size = 18
+outline_size = 1
+outline_color = Color( 0, 0, 0, 0 )
+use_filter = true
+font_data = ExtResource( 3 )
+
+[sub_resource type="CapsuleShape2D" id=42]
+radius = 60.4837
+height = 53.5718
+
+[sub_resource type="Animation" id=43]
+resource_name = "fade_out_counter"
+length = 2.0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Camera2D/UI/Panel:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 2 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 1 ), Color( 1, 1, 1, 0 ) ]
+}
+
+[sub_resource type="SpriteFrames" id=44]
+animations = [ {
+"frames": [ ExtResource( 8 ), ExtResource( 15 ), ExtResource( 14 ) ],
+"loop": true,
+"name": "default",
+"speed": 2.0
+} ]
+
+[sub_resource type="Animation" id=45]
+length = 0.2
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 0 ), Color( 1, 1, 1, 1 ) ]
+}
+
+[node name="VillasSecond2" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 18 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+scale = Vector2( 2, 2 )
+texture = ExtResource( 5 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="InteractableArea2" parent="BG" instance=ExtResource( 23 )]
+position = Vector2( 2285.05, 1087.83 )
+scale = Vector2( 1.47665, 0.158495 )
+script = SubResource( 34 )
+interaction_script = "res://assets/dialogues/jam/day1/Delivered.json"
+
+[node name="InteractableArea3" parent="BG" instance=ExtResource( 23 )]
+position = Vector2( 2990.04, 1264.59 )
+scale = Vector2( 1.53663, 0.186925 )
+script = SubResource( 34 )
+interaction_script = "res://assets/dialogues/jam/day1/Delivered.json"
+
+[node name="Bounds" type="StaticBody2D" parent="BG"]
+scale = Vector2( 0.999999, 0.999999 )
+
+[node name="q" type="CollisionPolygon2D" parent="BG/Bounds"]
+scale = Vector2( 0.785138, 1.00282 )
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 3847.39, 2.84452, 3839.2, 2140.67, 3043.56, 2132.78, 2856.62, 10.532, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, 2899.77, 13.3453, -128, 0 )
+
+[node name="ExitNode" parent="BG" instance=ExtResource( 21 )]
+position = Vector2( 2647.7, -66.3906 )
+scale = Vector2( 3.82072, 2.8801 )
+script = SubResource( 33 )
+exit_scene = "res://src/Scenes/Jam/Day2/Noon/Church.tscn"
+interaction_script = "res://assets/dialogues/jam/day1/VillasAreaAbove.json"
+
+[node name="ExitNode2" parent="BG" instance=ExtResource( 21 )]
+position = Vector2( 2726.44, 2111.22 )
+scale = Vector2( 3.38423, 2.97368 )
+exit_scene = "res://src/Scenes/Jam/Day2/Villas.tscn"
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" type="KinematicBody2D" parent="Characters"]
+light_mask = 3
+position = Vector2( 2744.92, 1935.67 )
+z_index = 3
+script = SubResource( 32 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Camera2D" type="Camera2D" parent="Characters/Evan"]
+z_index = 4096
+current = true
+limit_left = 0
+limit_top = 0
+limit_right = 3840
+limit_bottom = 2400
+smoothing_enabled = true
+smoothing_speed = 2.0
+editor_draw_limits = true
+
+[node name="UI" type="CanvasLayer" parent="Characters/Evan/Camera2D"]
+layer = 128
+script = ExtResource( 9 )
+
+[node name="Settings" type="Control" parent="Characters/Evan/Camera2D/UI"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Popup" type="Panel" parent="Characters/Evan/Camera2D/UI/Settings"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+script = SubResource( 35 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="NinePatchRect" type="NinePatchRect" parent="Characters/Evan/Camera2D/UI/Settings/Popup"]
+self_modulate = Color( 0, 0, 0, 1 )
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -404.0
+margin_top = -404.0
+margin_right = 404.0
+margin_bottom = 404.0
+texture = ExtResource( 4 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect"]
+margin_right = 809.0
+margin_bottom = 808.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer"]
+margin_right = 809.0
+margin_bottom = 67.0
+custom_fonts/font = ExtResource( 2 )
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+text = "SETTINGS"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CheckBox" type="CheckBox" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer"]
+margin_top = 71.0
+margin_right = 809.0
+margin_bottom = 146.0
+custom_icons/radio_checked = ExtResource( 4 )
+custom_icons/checked = ExtResource( 11 )
+custom_icons/radio_unchecked = ExtResource( 4 )
+custom_icons/unchecked = ExtResource( 13 )
+custom_fonts/font = SubResource( 37 )
+text = "Fullscreen"
+align = 1
+script = SubResource( 38 )
+
+[node name="VolumeSlider" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer" instance=ExtResource( 12 )]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+margin_left = 0.0
+margin_top = 150.0
+margin_right = 809.0
+margin_bottom = 577.0
+size_flags_vertical = 3
+custom_styles/slider = SubResource( 39 )
+value = -20.0
+
+[node name="Guide" type="Button" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer"]
+margin_top = 581.0
+margin_right = 809.0
+margin_bottom = 654.0
+custom_fonts/font = ExtResource( 2 )
+action_mode = 0
+button_mask = 7
+text = "GUIDE"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Quit" type="Button" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer"]
+margin_top = 658.0
+margin_right = 809.0
+margin_bottom = 731.0
+custom_fonts/font = ExtResource( 2 )
+text = "QUIT"
+script = SubResource( 40 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Close" type="Button" parent="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer"]
+margin_top = 735.0
+margin_right = 809.0
+margin_bottom = 808.0
+custom_fonts/font = ExtResource( 2 )
+text = "CLOSE"
+script = SubResource( 40 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="SaveIndicator" type="Control" parent="Characters/Evan/Camera2D/UI"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Popup" type="Popup" parent="Characters/Evan/Camera2D/UI/SaveIndicator"]
+visible = true
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="TextureRect" parent="Characters/Evan/Camera2D/UI/SaveIndicator/Popup"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = -60.5667
+margin_top = -60.54
+margin_right = -1.56665
+margin_bottom = -1.54004
+texture = ExtResource( 6 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="Characters/Evan/Camera2D/UI/SaveIndicator/Popup/TextureRect"]
+anchor_left = 0.5
+anchor_right = 0.5
+margin_left = -28.0
+margin_top = -25.2098
+margin_right = 28.0
+margin_bottom = 0.790161
+custom_fonts/font = SubResource( 41 )
+text = "Saving"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Panel" type="Panel" parent="Characters/Evan/Camera2D/UI"]
+margin_top = 21.0452
+margin_right = 604.0
+margin_bottom = 116.045
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="Characters/Evan/Camera2D/UI/Panel"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -298.0
+margin_top = -33.5
+margin_right = 298.0
+margin_bottom = 33.5
+custom_fonts/font = ExtResource( 2 )
+text = "NEWSPAPER DELIVERED: 0"
+autowrap = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Shadow" type="Sprite" parent="Characters/Evan"]
+modulate = Color( 0.176471, 0.176471, 0.176471, 0.513726 )
+position = Vector2( 0, 86.5081 )
+scale = Vector2( 0.200791, 0.117176 )
+texture = ExtResource( 7 )
+
+[node name="Sprite" type="AnimatedSprite" parent="Characters/Evan"]
+scale = Vector2( 2, 2 )
+frames = ExtResource( 1 )
+animation = "idle_front"
+playing = true
+
+[node name="Face" type="AnimatedSprite" parent="Characters/Evan"]
+visible = false
+frames = ExtResource( 17 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="Characters/Evan"]
+visible = false
+position = Vector2( 0, 49.6482 )
+shape = ExtResource( 16 )
+
+[node name="InteractableArea" type="Area2D" parent="Characters/Evan"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Characters/Evan/InteractableArea"]
+shape = SubResource( 42 )
+
+[node name="PlayerMovement" type="AnimationPlayer" parent="Characters/Evan"]
+anims/fade_out_counter = SubResource( 43 )
+
+[node name="Light2D" type="Light2D" parent="Characters/Evan"]
+texture = ExtResource( 7 )
+color = Color( 1, 1, 1, 0.211765 )
+energy = 0.9
+
+[node name="TalkBubble" type="Node2D" parent="Characters/Evan"]
+light_mask = 2
+position = Vector2( 44.9539, -19.0714 )
+z_index = 999
+script = ExtResource( 10 )
+
+[node name="AnimatedSprite" type="AnimatedSprite" parent="Characters/Evan/TalkBubble"]
+light_mask = 2
+position = Vector2( 70.5759, -109.711 )
+frames = SubResource( 44 )
+
+[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="Characters/Evan/TalkBubble"]
+volume_db = 3.105
+pitch_scale = 9.08
+attenuation = 0.933033
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Characters/Evan/TalkBubble"]
+anims/create_bubble = SubResource( 45 )
+
+[node name="AshamedGirl" parent="Characters" instance=ExtResource( 19 )]
+position = Vector2( 2339.81, 1278.67 )
+interaction_script = "res://assets/dialogues/jam/VillasMessiahComplex.json"
+
+[node name="InteractableArea" parent="Characters/AshamedGirl" index="3"]
+position = Vector2( -2.61401, 6.63867 )
+scale = Vector2( 5.24546, 16.4556 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 20 )]
+
+[node name="Transition" parent="." instance=ExtResource( 18 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 22 )]
+visible = false
+color = Color( 0.0666667, 0.117647, 0.298039, 1 )
+[connection signal="toggled" from="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer/CheckBox" to="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer/CheckBox" method="_on_CheckBox_toggled"]
+[connection signal="pressed" from="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer/Close" to="Characters/Evan/Camera2D/UI/Settings/Popup/NinePatchRect/VBoxContainer/Close" method="close_settings"]
+
+[editable path="Characters/AshamedGirl"]

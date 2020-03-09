@@ -1,0 +1,315 @@
+[gd_scene load_steps=16 format=2]
+
+[ext_resource path="res://assets/textures/light/light.png" type="Texture" id=1]
+[ext_resource path="res://assets/textures/light/spot.png" type="Texture" id=2]
+[ext_resource path="res://assets/textures/light/moonlight.png" type="Texture" id=3]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/Character.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/Effects/ShinySmall.tscn" type="PackedScene" id=7]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=8]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/Effects/Fog.tscn" type="PackedScene" id=10]
+[ext_resource path="res://assets/textures/light/ moonlight_particle.png" type="Texture" id=11]
+[ext_resource path="res://assets/textures/levels/testing/park_day2.png" type="Texture" id=12]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	global.set_can_talk(true)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if self.has_node(\"Particles\"): 
+		$Particles.emit_all()
+
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# Set the position of the player according to the last time 
+	# the player was in this scene
+	if (global.player_exit_points.has(self.name)):
+		player.global_position = global.player_exit_points[self.name].position
+		# Disable the exit node the player used previously
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = false
+		yield(get_tree().create_timer(2.5), \"timeout\")
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = true
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		# Stuff to do
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		global.set_save_data(self.name, {
+			\"dialogue_finished\": false,
+			\"current_position\": player.get_global_position()
+		})
+		# Stuff to do
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in()
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="GDScript" id=2]
+script/source = "extends Node2D
+
+func emit_all() -> void:
+	for node in self.get_children():
+		node.set_emitting(true)
+
+func stop_all_emission() -> void:
+	for node in self.get_children():
+		node.set_emitting(false)"
+
+[sub_resource type="ParticlesMaterial" id=3]
+render_priority = 10
+lifetime_randomness = 0.1
+emission_shape = 2
+emission_box_extents = Vector3( 960, 50, 1 )
+flag_disable_z = true
+direction = Vector3( 0, 1, 0 )
+gravity = Vector3( 3, 5, 0 )
+angular_velocity = 75.0
+angular_velocity_random = 0.75
+orbit_velocity = 0.0
+orbit_velocity_random = 0.0
+tangential_accel = 0.5
+tangential_accel_random = 1.0
+damping = 3.0
+angle = 117.7
+angle_random = 0.5
+scale = 0.5
+scale_random = 0.5
+color = Color( 0, 2.32, 2.31, 1 )
+
+[node name="Park" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 12 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+visible = false
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -149.381, 3290.25, 5802.41, 3223.37, 5779.86, -2.15238, 5696.47, 801.904, 5180.61, 769.966, 4913.76, 1060.48, 5151.37, 1360.98, 4613.26, 1815.23, 4669.17, 2171.64, 3840, 2368, 2908.55, 2153.28, 1181.09, 2223.31, 1098.06, 2066.81, 1307.72, 1647.51, 874.434, 1570.63, 1286.75, 1081.44, 147.634, 885.765, -34.066, -1.76908 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5752.13, -123.594, 5713.27, 579.164, 3026.15, 793.816, 2509.39, 141.91, 2056.24, 173.711, 1634.88, 857.417, 124.369, 738.166, -128, 0 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 6 )]
+position = Vector2( 200.086, 62.0087 )
+exit_scene = "res://src/Scenes/testing/Intro/Delivery.tscn"
+
+[node name="CanvasModulate" parent="BG" instance=ExtResource( 4 )]
+visible = false
+color = Color( 0.294118, 0.309804, 0.305882, 1 )
+
+[node name="Moonlight" type="Light2D" parent="BG"]
+light_mask = 2
+position = Vector2( 883.646, 447.458 )
+texture = ExtResource( 3 )
+texture_scale = 5.0
+color = Color( 0.92549, 0.952941, 0.0431373, 1 )
+mode = 2
+shadow_gradient_length = 0.3
+shadow_filter = 5
+shadow_filter_smooth = 3.0
+
+[node name="Sprite" type="Sprite" parent="BG/Moonlight"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Moonlight2" type="Light2D" parent="BG"]
+light_mask = 2
+position = Vector2( 764.796, 2324.29 )
+texture = ExtResource( 3 )
+texture_scale = 6.0
+color = Color( 1, 1, 1, 0.596078 )
+energy = 1.3
+shadow_gradient_length = 0.3
+shadow_filter = 5
+shadow_filter_smooth = 3.0
+
+[node name="Sprite" type="Sprite" parent="BG/Moonlight2"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Highlight" type="Light2D" parent="BG"]
+light_mask = 2
+position = Vector2( 800.981, 195.927 )
+rotation = 3.14159
+texture = ExtResource( 3 )
+texture_scale = 2.0
+color = Color( 0.960784, 0.988235, 0.027451, 0.498039 )
+energy = 1.1
+mode = 2
+shadow_gradient_length = 0.3
+shadow_filter = 5
+shadow_filter_smooth = 3.0
+
+[node name="Sprite" type="Sprite" parent="BG/Highlight"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Streetlamps" type="Node2D" parent="BG"]
+visible = false
+
+[node name="Streetlamps" type="Light2D" parent="BG/Streetlamps"]
+position = Vector2( 238.981, -77.2147 )
+texture = ExtResource( 1 )
+texture_scale = 0.4
+color = Color( 0.85098, 0.890196, 0.109804, 0.796078 )
+energy = 0.9
+
+[node name="Sprite" type="Sprite" parent="BG/Streetlamps/Streetlamps"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Streetlamps2" type="Light2D" parent="BG/Streetlamps"]
+position = Vector2( 618.416, -77.2147 )
+texture = ExtResource( 1 )
+texture_scale = 0.4
+color = Color( 0.85098, 0.890196, 0.109804, 0.796078 )
+energy = 0.9
+
+[node name="Sprite" type="Sprite" parent="BG/Streetlamps/Streetlamps2"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Streetlamps3" type="Light2D" parent="BG/Streetlamps"]
+position = Vector2( 895.607, -77.2147 )
+texture = ExtResource( 1 )
+texture_scale = 0.4
+color = Color( 0.85098, 0.890196, 0.109804, 0.796078 )
+energy = 0.9
+
+[node name="Sprite" type="Sprite" parent="BG/Streetlamps/Streetlamps3"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Streetlamps4" type="Light2D" parent="BG/Streetlamps"]
+position = Vector2( 1304.58, -81.7588 )
+texture = ExtResource( 1 )
+texture_scale = 0.4
+color = Color( 0.85098, 0.890196, 0.109804, 0.796078 )
+energy = 0.9
+
+[node name="Sprite" type="Sprite" parent="BG/Streetlamps/Streetlamps4"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Streetlamps5" type="Light2D" parent="BG/Streetlamps"]
+position = Vector2( 1715.82, -81.7588 )
+texture = ExtResource( 1 )
+texture_scale = 0.4
+color = Color( 0.85098, 0.890196, 0.109804, 0.796078 )
+energy = 0.9
+
+[node name="Sprite" type="Sprite" parent="BG/Streetlamps/Streetlamps5"]
+visible = false
+texture = ExtResource( 2 )
+
+[node name="Characters" type="Node2D" parent="."]
+position = Vector2( -764.264, -483.073 )
+
+[node name="Evan" parent="Characters" instance=ExtResource( 8 )]
+position = Vector2( 1533.13, 683.838 )
+interaction_script = "res://assets/dialogues/intro/Park-Chat.json"
+
+[node name="TemplateCharacter" parent="Characters" instance=ExtResource( 5 )]
+position = Vector2( 2019.31, 1036.16 )
+
+[node name="TemplateCharacter2" parent="Characters" instance=ExtResource( 5 )]
+position = Vector2( 2142.35, 850.53 )
+
+[node name="TemplateCharacter3" parent="Characters" instance=ExtResource( 5 )]
+position = Vector2( 1453.8, 906.65 )
+scale = Vector2( 1.54392, 2.70307 )
+
+[node name="Particles" type="Node2D" parent="."]
+script = SubResource( 2 )
+
+[node name="MoonlightParticle" type="Particles2D" parent="Particles"]
+visible = false
+light_mask = 3
+position = Vector2( 2636.12, 504.017 )
+scale = Vector2( 0.985994, 1.0981 )
+z_index = 100
+z_as_relative = false
+emitting = false
+amount = 5
+lifetime = 50.0
+preprocess = 10.0
+visibility_rect = Rect2( -1000, 0, 2100, 2500 )
+local_coords = false
+draw_order = 1
+process_material = SubResource( 3 )
+texture = ExtResource( 11 )
+
+[node name="MoonlightParticle2" parent="Particles" instance=ExtResource( 7 )]
+visible = false
+position = Vector2( 858.501, 1097.49 )
+
+[node name="Effects" type="Node2D" parent="."]
+visible = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Fog" parent="Effects" instance=ExtResource( 10 )]
+modulate = Color( 1, 1, 1, 0.0352941 )
+position = Vector2( 740.096, 609.478 )
+
+[node name="Fog2" parent="Effects" instance=ExtResource( 10 )]
+modulate = Color( 1, 1, 1, 0.0352941 )
+position = Vector2( 1042.2, -111.574 )
+
+[node name="Transition" parent="." instance=ExtResource( 9 )]
+light_mask = 524288
+
+[node name="BlackScreen" parent="Transition" index="0"]
+light_mask = 524288
+
+[editable path="Characters/Evan"]
+
+[editable path="Transition"]

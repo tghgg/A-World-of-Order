@@ -1,0 +1,254 @@
+[gd_scene load_steps=13 format=2]
+
+[ext_resource path="res://assets/textures/levels/final/day1/church2.png" type="Texture" id=1]
+[ext_resource path="res://src/Scripts/NewScene.gd" type="Script" id=3]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/Effects/Streetlamp.tscn" type="PackedScene" id=7]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=8]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=10]
+[ext_resource path="res://src/Templates/Effects/Moonlight.tscn" type="PackedScene" id=11]
+[ext_resource path="res://src/Templates/Character.tscn" type="PackedScene" id=12]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 1485.33, 1708.48 )
+
+[sub_resource type="GDScript" id=2]
+script/source = "extends KinematicBody2D
+
+# Export key variables for easy editing 
+export (Color) var color # COLOR OF THE TEXT
+
+export (float, 0.0, 1.9) var voice_pitch # HOW HIGH / LOW THE VOICE IS
+
+export (String, FILE) var interaction_script # A JSON DIALOGUE FILE
+
+# Initialize variables
+# Default scale = 35
+const SCALE := 35
+const ACCELERATION := 200 * SCALE
+const MAX_SPEED := 500 * SCALE
+
+onready var motion := Vector2(0, 0)
+onready var player_animation := $Sprite
+# Store the direction the player's hearding towards to set the animation correctly
+onready var current_direction := 0
+onready var area := $InteractableArea
+onready var UI := $Camera2D/UI
+onready var shake_amount := 3.0
+# Initializeer
+# Connect the interactable area's signals to interaction handlers
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = $Camera2D
+	# Set camera limit according to level's size
+	$Camera2D.limit_right = get_node(\"../../BG/Map\").get_texture().get_size().x * get_node(\"../../BG/Map\").scale.x
+	$Camera2D.limit_bottom = get_node(\"../../BG/Map\").get_texture().get_size().y * get_node(\"../../BG/Map\").scale.y
+# warning-ignore:return_value_discarded
+	area.connect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+# warning-ignore:return_value_discarded
+	area.connect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+# warning-ignore:return_value_discarded
+	self.connect(\"tree_exited\", self, \"_on_tree_exited\")
+
+
+# Dialogue handler
+func talk() -> void:
+#	print(\"talking to \" + self.name)
+	if interaction_script:
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else:
+		print(\"No dialogue found for the player\")
+
+
+# Interaction with NPCs and objects handler
+func _on_InteractableArea_entered(body: Area2D) -> void:
+	global.set_current_body(body)
+	# Show talk bubble if body can be talked to
+	if body.get_parent() as KinematicBody2D:
+		if body.get_parent().interaction_script:
+			$TalkBubble.play_animation()
+func _on_InteractableArea_exited(_body: Area2D) -> void:
+	global.set_current_body(null)
+	# Hide talk bubble
+	if $TalkBubble.modulate.a != 0:
+		$TalkBubble.stop_animation()
+
+# Input handler
+func _physics_process(delta) -> void:
+	# Shake the camera
+#	if global.shake_camera:
+#		$Camera2D.set_offset(Vector2( 
+#			rand_range(-1.0, 1.0) * shake_amount, 
+#			rand_range(-1.0, 1.0) * shake_amount 
+#		))
+#	else:
+#		$Camera2D.set_offset(Vector2(0, 0))
+		
+	# Open game settings when ESC is pressed
+	if Input.is_action_just_pressed(\"open_settings\"):
+		if not UI.get_node(\"Settings/Popup\").visible:
+			# Freeze player movement
+			if global.get_can_talk():
+				global.set_can_talk(false)
+				UI.popup_element(\"Settings\")
+		else:
+			if not global.get_can_talk():
+				global.set_can_talk(true, false)
+				UI.hide_element(\"Settings\")
+	
+	# Check whether player is in dialogue
+	# If in dialogue then freeze all movement until dialogue is finished
+	if global.get_can_talk():
+		# Interaction Input
+		if Input.is_action_just_pressed(\"interact\") and global.get_current_body() != null:
+			if global.get_current_body().get_parent() as KinematicBody2D:
+				print(\"Talk to \" + global.get_current_body().get_parent().name)
+				# get the parent of the area2d which is the Kinematic2D node and use the talk() method
+				global.get_current_body().get_parent().talk()
+		# Sideway motion
+		if Input.is_action_pressed(\"ui_right\"):
+			motion.x = min(motion.x + ACCELERATION, MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = true
+			current_direction = 2
+		elif Input.is_action_pressed(\"ui_left\"):
+			motion.x = max(motion.x - ACCELERATION, -MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = false
+			current_direction = 2
+		else:
+			# TODO: Fix jittering after stopping
+			motion.x = lerp(motion.x, 0.0, 1)
+		# check for top-down movement 
+		if global.get_top_down(): 
+			if Input.is_action_pressed(\"ui_up\"):
+				motion.y = max(motion.y - ACCELERATION, -MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = -1
+			elif Input.is_action_pressed(\"ui_down\"):
+				motion.y = min(motion.y + ACCELERATION, MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = 1
+			else:
+				#motion.x = lerp(motion.x, 0, 0.2)   adds a bit of inertia when stopped
+				motion.y = 0
+		# Play idle animation based on current direction if standing still
+		# 0 is idle
+		# 1 is forward
+		# -1 is backward
+		# 2 is sideways
+		if motion == Vector2(0, 0):
+			match(current_direction):
+				-1:
+					player_animation.play(\"idle_front\")
+				0:
+					player_animation.play(\"idle_front\")
+				1:
+					player_animation.play(\"idle_front\")
+				2:
+					player_animation.play(\"idle_front\")
+	else:
+		motion = Vector2(0, 0)
+		match(current_direction):
+			-1:
+				player_animation.play(\"idle_front\")
+			0:
+				player_animation.play(\"idle_front\")
+			1:
+				player_animation.play(\"idle_front\")
+			2:
+				player_animation.play(\"idle_front\")
+		# Advance the dialog when dialogue is happening
+		if Input.is_action_just_pressed(\"dialogue_next\"):
+			# Check if the settings menu is open
+			if UI.get_node(\"Settings/Popup\").visible:
+				return
+			# if menu hidden then it means that there is a dialogue happening
+			MSG.next()
+
+	# move with 'motion' speed, the up direction is y=1, and stop on slopes
+# warning-ignore:return_value_discarded
+	move_and_slide(motion * delta)
+
+# Clear signal connections when the scene ends
+func _on_tree_exited() -> void:
+	area.disconnect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+	area.disconnect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+
+
+"
+
+[node name="ChurchNight" type="Node2D" groups=[
+"level_root",
+]]
+script = ExtResource( 3 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+scale = Vector2( 1.5, 1.5 )
+texture = ExtResource( 1 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG"]
+scale = Vector2( 0.499999, 0.499999 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 5787.4, 23.3807, 5779.03, 3195.05, 0, 3255.48, 0, 0, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Bounds"]
+position = Vector2( 0, 1982.77 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionPolygon2D3" type="CollisionShape2D" parent="BG/Bounds"]
+position = Vector2( 626.395, 1625.43 )
+shape = SubResource( 1 )
+
+[node name="CollisionPolygon2D4" type="CollisionShape2D" parent="BG/Bounds"]
+position = Vector2( 5130.87, 1588.93 )
+shape = SubResource( 1 )
+
+[node name="ExitNode" parent="BG" instance=ExtResource( 10 )]
+position = Vector2( 1400.73, 1622.41 )
+scale = Vector2( 2.7295, 2.3418 )
+exit_scene = "res://src/Scenes/Jam/Day1/Night/MainPath.tscn"
+interaction_script = "res://assets/dialogues/jam/day1/Done.json"
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 8 )]
+position = Vector2( 1432.7, 1407.9 )
+script = SubResource( 2 )
+color = Color( 0, 0, 0, 1 )
+
+[node name="TemplateCharacter" parent="Characters" instance=ExtResource( 12 )]
+position = Vector2( 1652.11, 1006.26 )
+scale = Vector2( 3, 3 )
+interaction_script = "res://assets/dialogues/jam/day1/ChurchNightPrayer.json"
+
+[node name="Effects" type="Node2D" parent="."]
+position = Vector2( -85.1531, 88.0895 )
+
+[node name="Streetlamps4" parent="Effects" instance=ExtResource( 7 )]
+position = Vector2( 1542.19, 1771.23 )
+texture_scale = 2.0
+energy = 0.8
+
+[node name="Moonlight" parent="Effects" instance=ExtResource( 11 )]
+position = Vector2( 1527.35, 397.652 )
+energy = 1.0
+
+[node name="CGHandler" parent="." instance=ExtResource( 5 )]
+
+[node name="Transition" parent="." instance=ExtResource( 6 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 9 )]
+color = Color( 0.0666667, 0.117647, 0.298039, 1 )
+
+[editable path="Characters/Evan"]

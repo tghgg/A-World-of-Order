@@ -1,0 +1,151 @@
+[gd_scene load_steps=10 format=2]
+
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=2]
+[ext_resource path="res://assets/textures/levels/final/day1/evan_s bed room.png.png" type="Texture" id=3]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=7]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset delivery flag for day 2
+	if global.temp_variables.has(\"has_delivery\"):
+		global.temp_variables[\"has_delivery\"] = false
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if $Effects.has_node(\"Particles\"): 
+		$Effects/Particles.emit_all()
+	
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		
+		if save_data[self.name].has(\"dialogue_finished\"):
+			if save_data[self.name][\"dialogue_finished\"]:
+				global.set_can_talk(true)
+		else:
+			global.set_can_talk(true)
+	
+		# Set the position of the player according to the last time 
+		# the player was in this scene
+		if save_data[self.name].has(\"exit_point\"):
+			# Set x and y separately because Vector2 is a Godot thing, not a JSON thing
+			player.global_position.x = save_data[self.name][\"exit_point\"][\"position_x\"]
+			player.global_position.y = save_data[self.name][\"exit_point\"][\"position_y\"]
+			# Disable the exit node the player used previously
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = false
+			yield(get_tree().create_timer(2.5), \"timeout\")
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = true
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		# Create the save entry for the level
+		global.set_save_data(self.name, {})
+		# Stuff to do
+		global.set_can_talk(true)
+		if player.interaction_script:
+			player.talk()
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 241.415, 239.324 )
+
+[sub_resource type="Environment" id=3]
+background_mode = 4
+glow_bloom = 0.06
+
+[node name="EvanRoom2" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 3 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5727.74, 1111.48, 4637.16, 1111.48, 4637.16, 2524.93, 3776.17, 2524.93, 3776.17, 2840.62, 3230.88, 2840.62, 3230.88, 2589.5, 1300.84, 2582.33, 1293.66, 2517.75, 891.872, 2517.75, 877.522, 2015.51, 1308.01, 2022.69, 1279.32, 1427.17, 2097.25, 1448.7, 2104.43, 6.54666, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 1079.05 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionPolygon2D3" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 4208.11, 1324.36 )
+shape = SubResource( 2 )
+
+[node name="CollisionPolygon2D4" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 4375.42, 2301.11 )
+shape = SubResource( 2 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 7 )]
+position = Vector2( 315.276, 740.974 )
+rotation = 1.57079
+exit_scene = "res://src/Scenes/Jam/Day2/EvanLivingRoom.tscn"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 3 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 5 )]
+position = Vector2( 990.38, 526.608 )
+interaction_script = "res://assets/dialogues/jam/day2/EvanRoom.json"
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 2 )]
+
+[node name="Transition" parent="." instance=ExtResource( 4 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 6 )]
+visible = false
+color = Color( 0.0666667, 0.117647, 0.298039, 1 )
+
+[editable path="Characters/Evan"]

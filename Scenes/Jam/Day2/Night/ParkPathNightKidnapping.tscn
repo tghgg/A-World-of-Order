@@ -1,0 +1,726 @@
+[gd_scene load_steps=33 format=2]
+
+[ext_resource path="res://particle.png" type="Texture" id=1]
+[ext_resource path="res://assets/textures/levels/final/day2/park pathway.png" type="Texture" id=3]
+[ext_resource path="res://src/Scripts/TalkBubble.gd" type="Script" id=4]
+[ext_resource path="res://src/Scripts/BG.gd" type="Script" id=5]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/Effects/Moonlight.tscn" type="PackedScene" id=7]
+[ext_resource path="res://assets/textures/light/spot.png" type="Texture" id=8]
+[ext_resource path="res://assets/textures/levels/final/day1/tree 1.png" type="Texture" id=9]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=10]
+[ext_resource path="res://src/Templates/Objects/Tree.tscn" type="PackedScene" id=11]
+[ext_resource path="res://src/Templates/InteractableArea.tscn" type="PackedScene" id=12]
+[ext_resource path="res://src/Templates/Effects/Streetlamp.tscn" type="PackedScene" id=13]
+[ext_resource path="res://icon.png" type="Texture" id=14]
+[ext_resource path="res://assets/characters/player/frame0002.png" type="Texture" id=15]
+[ext_resource path="res://src/Templates/UI.tscn" type="PackedScene" id=16]
+[ext_resource path="res://assets/textures/light/player_light.png" type="Texture" id=17]
+[ext_resource path="res://assets/characters/player/face.tres" type="SpriteFrames" id=18]
+[ext_resource path="res://assets/characters/player/frame0001.png" type="Texture" id=19]
+[ext_resource path="res://assets/characters/player/sprite.tres" type="SpriteFrames" id=20]
+[ext_resource path="res://assets/characters/player/body_shape.tres" type="Shape2D" id=21]
+[ext_resource path="res://assets/characters/player/frame0000.png" type="Texture" id=22]
+[ext_resource path="res://assets/textures/light/light.png" type="Texture" id=23]
+
+[sub_resource type="GDScript" id=10]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if $Effects.has_node(\"Particles\"): 
+		$Effects/Particles.emit_all()
+	
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		
+		if save_data[self.name].has(\"dialogue_finished\"):
+			if save_data[self.name][\"dialogue_finished\"]:
+				global.set_can_talk(true)
+		else:
+			global.set_can_talk(true)
+	
+		# Set the position of the player according to the last time 
+		# the player was in this scene
+		if save_data[self.name].has(\"exit_point\"):
+			# Set x and y separately because Vector2 is a Godot thing, not a JSON thing
+			player.global_position.x = save_data[self.name][\"exit_point\"][\"position_x\"]
+			player.global_position.y = save_data[self.name][\"exit_point\"][\"position_y\"]
+			# Disable the exit node the player used previously
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = false
+			yield(get_tree().create_timer(2.5), \"timeout\")
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = true
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		# Create the save entry for the level
+		global.set_save_data(self.name, {})
+		# Stuff to do
+		global.set_can_talk(true)
+		if player.interaction_script:
+			player.talk()
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 41.4747, 63.2808 )
+
+[sub_resource type="GDScript" id=2]
+script/source = "extends Area2D
+
+export (String, FILE) var interaction_script
+
+onready var root_node := self.get_parent().get_parent().get_parent()
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+	
+func _on_InteractableArea_area_entered(area: Area2D) -> void:
+	if area.get_parent() as KinematicBody2D:
+		if area.get_parent().name == global.current_player_name:
+			talk()
+			yield(global, \"dialogue_finished\")
+			global.set_shake_camera(true, 1.0)
+			get_node(\"../../Transition\").fade_in(0.2)
+			interaction_script = \"res://assets/dialogues/jam/day2/EvanKidnapping2.json\"
+			yield(get_tree(), \"idle_frame\")
+			talk()
+			yield(global, \"dialogue_finished\")
+			get_node(\"../../Transition\").fade_out(2.0)
+			get_node(\"../DroppedKeys\").set_visible(true)
+			get_node(\"../../Characters/Evan\").queue_free()
+			yield(get_tree().create_timer(2.0), \"timeout\")
+			get_parent().get_parent().change_scene(\"res://src/Scenes/Jam/Day3/MainPath.tscn\", 1.5, 4.0)
+			global.current_player_name = \"Helen\"
+"
+
+[sub_resource type="GDScript" id=8]
+script/source = "extends \"res://src/Scripts/NPC.gd\"
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+		yield(global, 'dialogue_finished')
+		yield(get_tree(), \"idle_frame\")
+		queue_free()
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+"
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 98.142, 144.04 )
+
+[sub_resource type="GDScript" id=9]
+script/source = "extends KinematicBody2D
+
+# Export key variables for easy editing 
+export (Color) var color # COLOR OF THE TEXT
+
+export (float, 0.0, 1.9) var voice_pitch # HOW HIGH / LOW THE VOICE IS
+
+export (String, FILE) var interaction_script # A JSON DIALOGUE FILE
+
+# Initialize variables
+# Default scale = 35
+const SCALE := 50
+const ACCELERATION := 200 * SCALE
+const MAX_SPEED := 500 * SCALE
+
+onready var motion := Vector2(0, 0)
+onready var player_animation := $Sprite
+# Store the direction the player's hearding towards to set the animation correctly
+onready var current_direction := 0
+onready var area := $InteractableArea
+onready var UI := $Camera2D/UI
+onready var shake_amount := 3.0
+
+# Initializeer
+# Connect the interactable area's signals to interaction handlers
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = $Camera2D
+	# Set camera limit according to level's size
+	$Camera2D.limit_right = get_node(\"../../BG/Map\").get_texture().get_size().x * get_node(\"../../BG/Map\").scale.x
+	$Camera2D.limit_bottom = get_node(\"../../BG/Map\").get_texture().get_size().y * get_node(\"../../BG/Map\").scale.y
+# warning-ignore:return_value_discarded
+	area.connect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+# warning-ignore:return_value_discarded
+	area.connect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+# warning-ignore:return_value_discarded
+	self.connect(\"tree_exited\", self, \"_on_tree_exited\")
+
+
+# Dialogue handler
+func talk() -> void:
+#	print(\"talking to \" + self.name)
+	if interaction_script:
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else:
+		print(\"No dialogue found for the player\")
+
+
+# Interaction with NPCs and objects handler
+func _on_InteractableArea_entered(body: Area2D) -> void:
+	global.set_current_body(body)
+	# Show talk bubble if body can be talked to
+	if body.get_parent() as KinematicBody2D:
+		if body.get_parent().interaction_script:
+			$TalkBubble.play_animation()
+func _on_InteractableArea_exited(_body: Area2D) -> void:
+	global.set_current_body(null)
+	# Hide talk bubble
+	if $TalkBubble.modulate.a != 0:
+		$TalkBubble.stop_animation()
+
+# Input handler
+func _physics_process(delta) -> void:
+	# Shake the camera
+	if global.shake_camera:
+		$Camera2D.set_offset(Vector2( 
+			rand_range(-5.0, 5.0) * shake_amount, 
+			rand_range(-5.0, 5.0) * shake_amount 
+		))
+	else:
+		$Camera2D.set_offset(Vector2(0, 0))
+
+	# Open game settings when ESC is pressed
+	if Input.is_action_just_pressed(\"open_settings\"):
+		if not UI.get_node(\"Settings/Popup\").visible:
+			# Freeze player movement
+			if global.get_can_talk():
+				global.set_can_talk(false)
+				UI.popup_element(\"Settings\")
+		else:
+			if not global.get_can_talk():
+				global.set_can_talk(true, false)
+				UI.hide_element(\"Settings\")
+	
+	# Check whether player is in dialogue
+	# If in dialogue then freeze all movement until dialogue is finished
+	if global.get_can_talk():
+		# Interaction Input
+		if Input.is_action_just_pressed(\"interact\") and global.get_current_body() != null:
+			if global.get_current_body().get_parent() as KinematicBody2D:
+				print(\"Talk to \" + global.get_current_body().get_parent().name)
+				# get the parent of the area2d which is the Kinematic2D node and use the talk() method
+				global.get_current_body().get_parent().talk()
+		# Sideway motion
+		if Input.is_action_pressed(\"ui_right\"):
+			motion.x = min(motion.x + ACCELERATION, MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = true
+			current_direction = 2
+		elif Input.is_action_pressed(\"ui_left\"):
+			motion.x = max(motion.x - ACCELERATION, -MAX_SPEED)
+			player_animation.play(\"walking\")
+			player_animation.flip_h = false
+			current_direction = 2
+		else:
+			# TODO: Fix jittering after stopping
+			motion.x = lerp(motion.x, 0.0, 1)
+		# check for top-down movement 
+		if global.get_top_down(): 
+			if Input.is_action_pressed(\"ui_up\"):
+				motion.y = max(motion.y - ACCELERATION, -MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = -1
+			elif Input.is_action_pressed(\"ui_down\"):
+				motion.y = min(motion.y + ACCELERATION, MAX_SPEED)
+				player_animation.play(\"walking\")
+				current_direction = 1
+			else:
+				#motion.x = lerp(motion.x, 0, 0.2)   adds a bit of inertia when stopped
+				motion.y = 0
+		# Play idle animation based on current direction if standing still
+		# 0 is idle
+		# 1 is forward
+		# -1 is backward
+		# 2 is sideways
+		if motion == Vector2(0, 0):
+			match(current_direction):
+				-1:
+					player_animation.play(\"idle_front\")
+				0:
+					player_animation.play(\"idle_front\")
+				1:
+					player_animation.play(\"idle_front\")
+				2:
+					player_animation.play(\"idle_front\")
+	else:
+		motion = Vector2(0, 0)
+		match(current_direction):
+			-1:
+				player_animation.play(\"idle_front\")
+			0:
+				player_animation.play(\"idle_front\")
+			1:
+				player_animation.play(\"idle_front\")
+			2:
+				player_animation.play(\"idle_front\")
+		# Advance the dialog when dialogue is happening
+		if Input.is_action_just_pressed(\"dialogue_next\"):
+			# Check if the settings menu is open
+			if UI.get_node(\"Settings/Popup\").visible:
+				return
+			# if menu hidden then it means that there is a dialogue happening
+			MSG.next()
+
+	# move with 'motion' speed, the up direction is y=1, and stop on slopes
+# warning-ignore:return_value_discarded
+	move_and_slide(motion * delta)
+
+# Clear signal connections when the scene ends
+func _on_tree_exited() -> void:
+	area.disconnect(\"area_entered\", self, \"_on_InteractableArea_entered\")
+	area.disconnect(\"area_exited\", self, \"_on_InteractableArea_exited\")
+
+
+"
+
+[sub_resource type="CapsuleShape2D" id=4]
+radius = 60.4837
+height = 53.5718
+
+[sub_resource type="SpriteFrames" id=5]
+animations = [ {
+"frames": [ ExtResource( 22 ), ExtResource( 19 ), ExtResource( 15 ) ],
+"loop": true,
+"name": "default",
+"speed": 2.0
+} ]
+
+[sub_resource type="Animation" id=6]
+resource_name = "create_bubble"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 0 ), Color( 1, 1, 1, 1 ) ]
+}
+
+[sub_resource type="ParticlesMaterial" id=7]
+render_priority = 10
+lifetime_randomness = 0.1
+emission_shape = 2
+emission_box_extents = Vector3( 960, 50, 1 )
+flag_disable_z = true
+direction = Vector3( 0, 1, 0 )
+gravity = Vector3( -3, 10, 0 )
+angular_velocity = 75.0
+angular_velocity_random = 0.75
+orbit_velocity = 0.0
+orbit_velocity_random = 0.0
+tangential_accel = 0.5
+tangential_accel_random = 1.0
+damping = 3.0
+angle = 117.7
+angle_random = 0.5
+scale = 0.2
+scale_random = 0.4
+color = Color( 0.0352941, 0.968627, 0.964706, 1 )
+
+[node name="ParkPathNightKidnapping" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 10 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 3 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 5787.4, 23.3807, 5779.03, 3195.05, 0, 3255.48, 0, 0, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 1335.67 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionPolygon2D3" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 2276.3 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="TreesFront" type="Node2D" parent="BG"]
+z_index = 10
+z_as_relative = false
+
+[node name="Tree7" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 179.371, 782.513 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree7"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree7"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree8" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 381.433, 922.929 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree8"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree8"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree10" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 867.751, 909.23 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree10"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree10"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree11" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 1141.73, 710.593 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree11"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree11"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree12" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 1258.18, 943.478 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree12"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree12"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree13" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 1515.03, 741.416 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree13"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree13"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree14" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 1795.87, 655.796 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree14"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree14"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree15" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 1713.67, 895.531 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree15"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree15"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="Tree9" type="StaticBody2D" parent="BG/TreesFront"]
+position = Vector2( 576.645, 755.115 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/TreesFront/Tree9"]
+texture = ExtResource( 9 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/TreesFront/Tree9"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 1 )
+
+[node name="TreeBack" type="Node2D" parent="BG"]
+position = Vector2( -308.23, -743.177 )
+z_index = 10
+z_as_relative = false
+
+[node name="Tree7" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 176.434, 782.513 )
+
+[node name="Tree8" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 381.433, 922.929 )
+
+[node name="Tree10" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 867.751, 909.23 )
+
+[node name="Tree11" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1141.73, 710.593 )
+
+[node name="Tree12" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1258.18, 943.478 )
+
+[node name="Tree13" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1515.03, 741.416 )
+
+[node name="Tree14" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1795.87, 655.796 )
+
+[node name="Tree15" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1713.67, 895.531 )
+
+[node name="Tree9" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 576.645, 755.115 )
+
+[node name="Tree16" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 1980.8, 936.628 )
+
+[node name="Tree17" parent="BG/TreeBack" instance=ExtResource( 11 )]
+position = Vector2( 2165.74, 676.345 )
+
+[node name="InteractableArea" parent="BG" instance=ExtResource( 12 )]
+position = Vector2( 983.668, 575.519 )
+script = SubResource( 2 )
+interaction_script = "res://assets/dialogues/jam/day2/EvanKidnapping1.json"
+
+[node name="DroppedKeys" type="KinematicBody2D" parent="BG"]
+visible = false
+position = Vector2( 1283.74, 504.351 )
+z_index = 1
+script = SubResource( 8 )
+__meta__ = {
+"_edit_group_": true
+}
+interaction_script = "res://assets/dialogues/jam/day2/EvanKeysFound.json"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/DroppedKeys"]
+shape = SubResource( 3 )
+disabled = true
+
+[node name="Sprite" type="Sprite" parent="BG/DroppedKeys"]
+rotation = 0.62557
+scale = Vector2( 0.978698, 1.07112 )
+texture = ExtResource( 1 )
+
+[node name="Light2D" type="Light2D" parent="BG/DroppedKeys"]
+position = Vector2( -2.02344, 1.42461 )
+texture = ExtResource( 23 )
+texture_scale = 0.1
+color = Color( 1, 1, 1, 0.419608 )
+
+[node name="Sprite" type="Sprite" parent="BG/DroppedKeys/Light2D"]
+visible = false
+texture = ExtResource( 8 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" type="KinematicBody2D" parent="Characters"]
+light_mask = 3
+position = Vector2( 1815.42, 517.879 )
+z_index = 3
+script = SubResource( 9 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Camera2D" type="Camera2D" parent="Characters/Evan"]
+z_index = 4096
+current = true
+limit_left = 0
+limit_top = 0
+limit_right = 3840
+limit_bottom = 2400
+smoothing_enabled = true
+smoothing_speed = 2.0
+editor_draw_limits = true
+
+[node name="UI" parent="Characters/Evan/Camera2D" instance=ExtResource( 16 )]
+
+[node name="Shadow" type="Sprite" parent="Characters/Evan"]
+modulate = Color( 0.176471, 0.176471, 0.176471, 0.513726 )
+position = Vector2( 0, 86.5081 )
+scale = Vector2( 0.200791, 0.117176 )
+texture = ExtResource( 17 )
+
+[node name="Sprite" type="AnimatedSprite" parent="Characters/Evan"]
+scale = Vector2( 2, 2 )
+frames = ExtResource( 20 )
+animation = "idle_front"
+playing = true
+
+[node name="Face" type="AnimatedSprite" parent="Characters/Evan"]
+visible = false
+frames = ExtResource( 18 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="Characters/Evan"]
+visible = false
+position = Vector2( 0, 49.6482 )
+shape = ExtResource( 21 )
+
+[node name="InteractableArea" type="Area2D" parent="Characters/Evan"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Characters/Evan/InteractableArea"]
+shape = SubResource( 4 )
+
+[node name="PlayerMovement" type="AnimationPlayer" parent="Characters/Evan"]
+
+[node name="Light2D" type="Light2D" parent="Characters/Evan"]
+texture = ExtResource( 17 )
+color = Color( 1, 1, 1, 0.211765 )
+energy = 0.9
+
+[node name="TalkBubble" type="Node2D" parent="Characters/Evan"]
+light_mask = 2
+position = Vector2( 44.9539, -19.0714 )
+z_index = 999
+script = ExtResource( 4 )
+
+[node name="AnimatedSprite" type="AnimatedSprite" parent="Characters/Evan/TalkBubble"]
+light_mask = 2
+position = Vector2( 70.5759, -109.711 )
+frames = SubResource( 5 )
+
+[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="Characters/Evan/TalkBubble"]
+volume_db = 3.105
+pitch_scale = 9.08
+attenuation = 0.933033
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Characters/Evan/TalkBubble"]
+anims/create_bubble = SubResource( 6 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="Moonlight" parent="Effects" instance=ExtResource( 7 )]
+position = Vector2( 1021.07, 200.103 )
+energy = 0.4
+
+[node name="MoonlightParticle" type="Particles2D" parent="Effects"]
+visible = false
+light_mask = 3
+position = Vector2( 944.744, 10.0042 )
+scale = Vector2( 0.985994, 1.0981 )
+z_index = 1001
+z_as_relative = false
+amount = 20
+lifetime = 30.0
+preprocess = 15.0
+visibility_rect = Rect2( -1000, 0, 2100, 1000 )
+local_coords = false
+draw_order = 1
+process_material = SubResource( 7 )
+texture = ExtResource( 1 )
+
+[node name="Streetlamps4" parent="Effects" instance=ExtResource( 13 )]
+position = Vector2( -208.202, 281.963 )
+
+[node name="Streetlamps5" parent="Effects" instance=ExtResource( 13 )]
+position = Vector2( -274.593, 817.514 )
+
+[node name="CGHandler" parent="." instance=ExtResource( 6 )]
+
+[node name="Transition" type="Node2D" parent="."]
+visible = false
+light_mask = 0
+z_index = 1000
+z_as_relative = false
+script = ExtResource( 5 )
+
+[node name="BlackScreen" type="Sprite" parent="Transition"]
+modulate = Color( 0, 0, 0, 1 )
+light_mask = 0
+position = Vector2( 904.716, 524.107 )
+scale = Vector2( 2508.56, 2830.28 )
+texture = ExtResource( 14 )
+
+[node name="FadeOut" type="Tween" parent="Transition"]
+playback_speed = 0.5
+playback/speed = 0.5
+
+[node name="FadeIn" type="Tween" parent="Transition"]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 10 )]
+color = Color( 0.0156863, 0.0235294, 0.054902, 1 )

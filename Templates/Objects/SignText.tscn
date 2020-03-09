@@ -1,0 +1,30 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://addons/MSG_System/fonts/font_normal.tres" type="DynamicFont" id=1]
+
+[node name="Container" type="Control"]
+margin_left = -174.0
+margin_top = -94.0
+margin_right = 23.0
+margin_bottom = -33.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="."]
+self_modulate = Color( 0, 0, 0, 1 )
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -93.8246
+margin_top = -33.5
+margin_right = 102.175
+margin_bottom = 33.5
+rect_scale = Vector2( 0.944803, 0.944803 )
+custom_fonts/font = ExtResource( 1 )
+text = "CHURCH"
+autowrap = true
+__meta__ = {
+"_edit_use_anchors_": false
+}

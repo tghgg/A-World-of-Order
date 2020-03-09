@@ -1,0 +1,139 @@
+[gd_scene load_steps=12 format=2]
+
+[ext_resource path="res://addons/MSG_System/fonts/font_normal.tres" type="DynamicFont" id=1]
+[ext_resource path="res://assets/textures/dialog_box.png" type="Texture" id=2]
+[ext_resource path="res://src/Templates/Future-Uses/VolumeSlider.tscn" type="PackedScene" id=3]
+[ext_resource path="res://addons/MSG_System/fonts/open_sans/OpenSans-Regular.ttf" type="DynamicFontData" id=4]
+[ext_resource path="res://icon.png" type="Texture" id=5]
+[ext_resource path="res://icon_cursed.png" type="Texture" id=6]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Panel
+
+func _ready() -> void:
+	if is_visible():
+		set_visible(false)
+"
+
+[sub_resource type="GDScript" id=2]
+script/source = "extends CheckBox
+
+func _ready() -> void:
+	if OS.window_fullscreen:
+		pressed = true
+	else:
+		pressed = false
+
+func _on_CheckBox_toggled(button_pressed: bool) -> void:
+	if button_pressed:
+		OS.window_fullscreen = true
+	else:
+		OS.window_fullscreen = false
+"
+
+[sub_resource type="StyleBoxLine" id=3]
+color = Color( 1, 1, 1, 1 )
+
+[sub_resource type="DynamicFont" id=4]
+size = 48
+outline_size = 1
+outline_color = Color( 0, 0, 0, 1 )
+use_mipmaps = true
+use_filter = true
+font_data = ExtResource( 4 )
+
+[sub_resource type="GDScript" id=5]
+script/source = "extends Button
+
+func close_settings() -> void:
+	get_parent().get_parent().get_parent().set_visible(false)
+"
+
+[node name="Settings" type="Panel"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+script = SubResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="NinePatchRect" parent="."]
+self_modulate = Color( 0, 0, 0, 1 )
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -404.0
+margin_top = -404.0
+margin_right = 404.0
+margin_bottom = 404.0
+texture = ExtResource( 2 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TextureRect"]
+margin_right = 809.0
+margin_bottom = 808.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="TextureRect/VBoxContainer"]
+margin_right = 809.0
+margin_bottom = 67.0
+custom_fonts/font = ExtResource( 1 )
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+text = "SETTINGS"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CheckBox" type="CheckBox" parent="TextureRect/VBoxContainer"]
+margin_top = 71.0
+margin_right = 809.0
+margin_bottom = 146.0
+custom_icons/radio_checked = ExtResource( 2 )
+custom_icons/checked = ExtResource( 6 )
+custom_icons/radio_unchecked = ExtResource( 2 )
+custom_icons/unchecked = ExtResource( 5 )
+custom_fonts/font = ExtResource( 1 )
+text = "Fullscreen"
+align = 1
+script = SubResource( 2 )
+
+[node name="VolumeSlider" parent="TextureRect/VBoxContainer" instance=ExtResource( 3 )]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+margin_left = 0.0
+margin_top = 150.0
+margin_right = 809.0
+margin_bottom = 731.0
+size_flags_vertical = 3
+custom_styles/slider = SubResource( 3 )
+value = 0.0
+
+[node name="Label" parent="TextureRect/VBoxContainer/VolumeSlider" index="0"]
+margin_top = 167.271
+margin_bottom = 239.271
+custom_fonts/font = ExtResource( 1 )
+
+[node name="Button" type="Button" parent="TextureRect/VBoxContainer"]
+margin_top = 735.0
+margin_right = 809.0
+margin_bottom = 808.0
+custom_fonts/font = SubResource( 4 )
+text = "CLOSE"
+script = SubResource( 5 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+[connection signal="toggled" from="TextureRect/VBoxContainer/CheckBox" to="TextureRect/VBoxContainer/CheckBox" method="_on_CheckBox_toggled"]
+[connection signal="pressed" from="TextureRect/VBoxContainer/Button" to="TextureRect/VBoxContainer/Button" method="close_settings"]
+
+[editable path="TextureRect/VBoxContainer/VolumeSlider"]

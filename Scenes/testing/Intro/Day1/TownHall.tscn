@@ -1,0 +1,287 @@
+[gd_scene load_steps=22 format=2]
+
+[ext_resource path="res://assets/textures/dialog_box.png" type="Texture" id=1]
+[ext_resource path="res://assets/textures/levels/testing/townhall.png" type="Texture" id=2]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=3]
+[ext_resource path="res://icon.png" type="Texture" id=4]
+[ext_resource path="res://assets/textures/light/player_light.png" type="Texture" id=5]
+[ext_resource path="res://assets/textures/light/spot.png" type="Texture" id=6]
+[ext_resource path="res://assets/textures/bg.png" type="Texture" id=7]
+[ext_resource path="res://src/Templates/LayerSystem.tscn" type="PackedScene" id=8]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=10]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=11]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		# Stuff to do
+		if save_data[self.name][\"dialogue_finished\"]:
+			get_node(\"BG/Map/ExitNode2\").queue_free()
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		global.set_save_data(self.name, {
+			\"dialogue_finished\": false,
+			\"current_position\": player.get_global_position()
+		})
+		# Stuff to do
+	
+	global.set_can_talk(true)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if self.has_node(\"Particles\"): 
+		$Particles.emit_all()
+
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# Set the position of the player according to the last time 
+	# the player was in this scene
+	if (global.player_exit_points.has(self.name)):
+		player.global_position = global.player_exit_points[self.name].position
+		# Disable the exit node the player used previously
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = false
+		yield(get_tree().create_timer(2.5), \"timeout\")
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = true
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="GDScript" id=2]
+script/source = "extends Area2D
+
+export (String, FILE) var exit_scene
+
+# Connect signals 
+func _ready() -> void:
+	self.connect(\"body_entered\", self, \"_on_body_entered\")
+
+# Exit function
+func _on_body_entered(body: PhysicsBody2D) -> void:
+	if body as KinematicBody2D and body.name == global.current_player_name:
+		var current_root := body.get_parent().get_parent()
+		# Bump the mayor 
+		get_node(\"../../../Characters/Mayor/MovementHandler\").play(\"bump\")
+		global.set_can_talk(false)
+		global.set_shake_camera(true)
+		yield(get_tree().create_timer(0.4), \"timeout\")
+		global.set_shake_camera(false)
+		global.get_player().talk()
+		yield(global, \"dialogue_finished\")
+		global.set_save_data(current_root.name, {
+			\"dialogue_finished\": true,
+			\"current_position\": global.get_player().get_global_position()
+		})
+"
+
+[sub_resource type="Environment" id=3]
+background_mode = 4
+glow_bloom = 0.06
+
+[sub_resource type="GDScript" id=4]
+script/source = "extends \"res://src/Scripts/NPC.gd\"
+
+# Dialogue handler 
+func talk() -> void:
+	# Talk if the character has dialogue
+	if (interaction_script):
+		global.set_can_talk(false)
+		MSG.start_dialogue(interaction_script, self)
+	else: 
+		print('No dialogue available for the character')
+	# Some space to add dynamic events here
+	#yield(global, 'dialogue_finished')
+"
+
+[sub_resource type="SpriteFrames" id=5]
+animations = [ {
+"frames": [ ExtResource( 4 ) ],
+"loop": true,
+"name": "default",
+"speed": 5.0
+} ]
+
+[sub_resource type="CapsuleShape2D" id=6]
+radius = 35.5811
+height = 3.53159
+
+[sub_resource type="CapsuleShape2D" id=7]
+
+[sub_resource type="SpriteFrames" id=8]
+animations = [ {
+"frames": [ ExtResource( 4 ), ExtResource( 1 ), ExtResource( 7 ) ],
+"loop": true,
+"name": "default",
+"speed": 5.0
+} ]
+
+[sub_resource type="Animation" id=9]
+resource_name = "bump"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ Vector2( 2051.21, 512.807 ), Vector2( 1794, 512.807 ) ]
+}
+
+[sub_resource type="OccluderPolygon2D" id=10]
+polygon = PoolVector2Array( -0.271851, -35.7559, -55.4314, 1.24132, -1.61722, 28.8211, 64.3051, -3.46742 )
+
+[node name="TownHall" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 2 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 2976.19, 50.5398, 3187.6, 517.416, 4693.94, 878.584, 5257.71, 1609.73, 5733.4, 1609.73, 5733.4, 1821.15, 5222.48, 1812.34, 4685.13, 2552.29, 3390.21, 2931.08, 3381.4, 3204.16, 2509.31, 3212.97, 2518.12, 2922.27, 1011.78, 2473.01, 747.514, 2050.18, 668.233, 1636.16, 1187.96, 957.865, 2262.66, 587.888, 3117.13, 526.225, -1.2497, -28.7411 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 10 )]
+position = Vector2( 991.112, 1052.06 )
+exit_scene = "res://src/Scenes/testing/Intro/TownHallHall.tscn"
+
+[node name="ExitNode2" type="Area2D" parent="BG/Map"]
+position = Vector2( 1763.93, 544.174 )
+rotation = -1.61136
+script = SubResource( 2 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/ExitNode2"]
+position = Vector2( -549.475, -448.552 )
+polygon = PoolVector2Array( 452.093, 444.031, 645.654, 423.218, 651.898, 462.763, 448.971, 475.251 )
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 3 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 9 )]
+position = Vector2( 979.247, 848.901 )
+interaction_script = "res://assets/dialogues/intro/Mayor.json"
+
+[node name="Sprite" parent="Characters/Evan" index="2"]
+frame = 0
+
+[node name="Mayor" type="KinematicBody2D" parent="Characters"]
+position = Vector2( 2051.21, 512.807 )
+scale = Vector2( 2.4527, 2.4527 )
+z_index = 1
+script = SubResource( 4 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Shadow" type="Sprite" parent="Characters/Mayor"]
+modulate = Color( 0.0666667, 0.0666667, 0.0666667, 0.580392 )
+position = Vector2( -0.836243, 30.1046 )
+scale = Vector2( 0.154165, 0.0629665 )
+texture = ExtResource( 5 )
+
+[node name="Sprite" type="AnimatedSprite" parent="Characters/Mayor"]
+frames = SubResource( 5 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="Characters/Mayor"]
+shape = SubResource( 6 )
+disabled = true
+
+[node name="InteractableArea" type="Area2D" parent="Characters/Mayor"]
+visible = false
+scale = Vector2( 2.73996, 2.46791 )
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Characters/Mayor/InteractableArea"]
+scale = Vector2( 2.41862, -1.36485 )
+shape = SubResource( 7 )
+
+[node name="Face" type="AnimatedSprite" parent="Characters/Mayor"]
+visible = false
+frames = SubResource( 8 )
+
+[node name="MovementHandler" type="AnimationPlayer" parent="Characters/Mayor"]
+anims/bump = SubResource( 9 )
+
+[node name="Layer" parent="Characters/Mayor" instance=ExtResource( 8 )]
+visible = false
+
+[node name="LightOccluder2D" type="LightOccluder2D" parent="Characters/Mayor"]
+visible = false
+occluder = SubResource( 10 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="Moonlight" type="Light2D" parent="Effects"]
+light_mask = 2
+position = Vector2( 953.285, 545.055 )
+scale = Vector2( 1, 0.52 )
+texture = ExtResource( 5 )
+texture_scale = 3.0
+energy = 1.3
+shadow_gradient_length = 0.3
+shadow_filter = 5
+shadow_filter_smooth = 3.0
+
+[node name="Sprite" type="Sprite" parent="Effects/Moonlight"]
+visible = false
+texture = ExtResource( 6 )
+
+[node name="Transition" parent="." instance=ExtResource( 11 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 3 )]
+color = Color( 0.294118, 0.309804, 0.305882, 1 )
+
+[editable path="Characters/Evan"]

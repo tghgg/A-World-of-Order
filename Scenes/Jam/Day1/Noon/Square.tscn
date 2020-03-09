@@ -1,0 +1,221 @@
+[gd_scene load_steps=18 format=2]
+
+[ext_resource path="res://src/Scripts/NewScene.gd" type="Script" id=1]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=2]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Scripts/Layer.gd" type="Script" id=5]
+[ext_resource path="res://src/Templates/Future-Uses/SignTextSquare.tscn" type="PackedScene" id=6]
+[ext_resource path="res://assets/textures/levels/final/day1/court of commune lampost.png" type="Texture" id=7]
+[ext_resource path="res://assets/textures/levels/final/day1/tree 1.png" type="Texture" id=8]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=10]
+[ext_resource path="res://assets/textures/levels/final/day1/Court of the Commune .png" type="Texture" id=11]
+[ext_resource path="res://src/Templates/ObjectWithDialogue.tscn" type="PackedScene" id=12]
+[ext_resource path="res://src/Templates/Effects/PanCamera.tscn" type="PackedScene" id=13]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 556.298, 721.78 )
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 41.4747, 63.2808 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 44.3336, 58.813 )
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 212.837, 153.448 )
+
+[node name="SquareNoon" type="Node2D" groups=[
+"level_root",
+]]
+script = ExtResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+scale = Vector2( 2, 2 )
+texture = ExtResource( 11 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( -3.58741, 0 )
+polygon = PoolVector2Array( 3773.64, 1087.81, 4008.6, 1149.96, 4664.27, 1287.57, 5711.81, 1718.06, 5711.81, 1718.06, 5779.97, 1667.84, 5751.27, 1610.44, 4115.5, 221.25, 3356.26, 539.254, 3614.64, 539.254 )
+
+[node name="CollisionPolygon2D6" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 5917.78, -80.1465 )
+scale = Vector2( -1, 1 )
+polygon = PoolVector2Array( 3920.21, 1134.97, 4008.56, 1146.77, 4664.27, 1287.57, 5424.38, 1794.36, 5487.83, 2131.1, 5248.69, 2526.41, 4277.51, 2916.83, 3330.73, 3058.36, 3394.17, 3312.14, 5224.29, 3043.72, 5853.85, 2458.08, 5751.27, 1610.44, 4154.84, 989.804, 4071.12, 724.349, 3531.68, 506.851, 4036.77, 765.867, 3981.72, 969.842 )
+
+[node name="CollisionPolygon2D4" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 143.489, 477.006 )
+polygon = PoolVector2Array( 5169.05, 1086.35, 5169.05, 1086.35, 5124.75, 1553.26, 5312.19, 1839.54, 5615.51, 1713.44 )
+
+[node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( -892.575, 933.692 )
+polygon = PoolVector2Array( 6310.77, 1386.26, 5404.21, 1808.87, 4344.29, 1952.01, 4446.53, 2323.49, 6307.36, 2340.53 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionPolygon2D3" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 2990.48, 1450.86 )
+polygon = PoolVector2Array( 526.858, -185.318, 739.661, 183.037, 727.757, 471.191, 196.81, 478.366, 216.171, 635.455, 89.4419, 192.976, 61.2163, 20.6639, -184.234, 23.5859, -275.711, 661.231, -257.173, 452.024, -407.489, 459.935, -789.747, 485.541, -789.747, 485.541, -804.097, 209.305, -635.486, -174.556 )
+
+[node name="CollisionPolygon2D7" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2939.48, 697.767 )
+shape = SubResource( 1 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 9 )]
+position = Vector2( 995.827, 1065.32 )
+scale = Vector2( 1.83824, 0.693903 )
+exit_scene = "res://src/Scenes/Jam/Day1/Noon/MainPathNoon.tscn"
+
+[node name="InteractableObject" parent="BG" instance=ExtResource( 12 )]
+position = Vector2( 1949.41, 936.995 )
+scale = Vector2( 1.03647, 0.349422 )
+interaction_script = "res://assets/dialogues/jam/day1/SquarePlaque.json"
+
+[node name="Tree7" type="StaticBody2D" parent="BG"]
+position = Vector2( 1314.8, 2100.26 )
+scale = Vector2( 3.05744, 2.15056 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree7"]
+z_index = 10
+texture = ExtResource( 8 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree7"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 2 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree7"]
+monitoring = false
+monitorable = false
+script = ExtResource( 5 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree7/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree10" type="StaticBody2D" parent="BG"]
+position = Vector2( 2906.28, 2015.11 )
+scale = Vector2( 3.05744, 2.15056 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree10"]
+z_index = 10
+texture = ExtResource( 8 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree10"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 2 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree10"]
+monitoring = false
+monitorable = false
+script = ExtResource( 5 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree10/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree8" type="StaticBody2D" parent="BG"]
+position = Vector2( 699.646, 1916.52 )
+scale = Vector2( 2.68599, 2.51222 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree8"]
+z_index = 9
+texture = ExtResource( 8 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree8"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 2 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree8"]
+monitoring = false
+monitorable = false
+script = ExtResource( 5 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree8/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Tree9" type="StaticBody2D" parent="BG"]
+position = Vector2( 3336.01, 1788.69 )
+scale = Vector2( 2.68599, 2.51222 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Tree9"]
+z_index = 9
+texture = ExtResource( 8 )
+
+[node name="BodyShape" type="CollisionShape2D" parent="BG/Tree9"]
+position = Vector2( 1.45752, 171.388 )
+shape = SubResource( 2 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Tree9"]
+monitoring = false
+monitorable = false
+script = ExtResource( 5 )
+
+[node name="CollisionShape2D" type="CollisionPolygon2D" parent="BG/Tree9/LayerSystem"]
+polygon = PoolVector2Array( -26.8115, -255.627, -48.4714, -246.602, -48.4714, -246.602, -147.746, 67.4667, -123.379, 99.9567, -51.179, 116.202, 50.8032, 115.299, 112.173, 102.664, 132.93, 62.9542, 132.93, 62.9542, 10.1909, -244.797, 10.1909, -244.797 )
+
+[node name="Lamp" type="StaticBody2D" parent="BG"]
+position = Vector2( 2497.26, 2039.99 )
+scale = Vector2( 2.0268, 2.0268 )
+z_index = 11
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="Sprite" type="Sprite" parent="BG/Lamp"]
+z_index = 10
+texture = ExtResource( 7 )
+
+[node name="Container" parent="BG/Lamp/Sprite" instance=ExtResource( 6 )]
+
+[node name="t" type="CollisionShape2D" parent="BG/Lamp"]
+position = Vector2( 61.606, 141.798 )
+shape = SubResource( 3 )
+
+[node name="LayerSystem" type="Area2D" parent="BG/Lamp"]
+position = Vector2( -38.1605, -68.8059 )
+monitoring = false
+monitorable = false
+script = ExtResource( 5 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Lamp/LayerSystem"]
+position = Vector2( 11.0803, -52.0773 )
+shape = SubResource( 4 )
+
+[node name="PanCamera" parent="BG" instance=ExtResource( 13 )]
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 4 )]
+position = Vector2( 1882.91, 1998.55 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 2 )]
+
+[node name="Transition" parent="." instance=ExtResource( 3 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 10 )]
+color = Color( 0.980392, 1, 0.380392, 1 )
+
+[editable path="Characters/Evan"]

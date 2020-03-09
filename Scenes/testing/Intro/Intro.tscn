@@ -1,0 +1,212 @@
+[gd_scene load_steps=16 format=2]
+
+[ext_resource path="res://assets/textures/levels/testing/station.png" type="Texture" id=1]
+[ext_resource path="res://src/Scripts/BG.gd" type="Script" id=2]
+[ext_resource path="res://icon.png" type="Texture" id=3]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/Effects/Moonlight.tscn" type="PackedScene" id=7]
+[ext_resource path="res://src/Templates/Light.tscn" type="PackedScene" id=8]
+[ext_resource path="res://src/Templates/Effects/MoonlightParticleAbove.tscn" type="PackedScene" id=9]
+[ext_resource path="res://src/Templates/Character.tscn" type="PackedScene" id=10]
+[ext_resource path="res://assets/textures/levels/testing/station_car2.png" type="Texture" id=11]
+[ext_resource path="res://assets/textures/levels/testing/station_car1.png" type="Texture" id=12]
+[ext_resource path="res://src/Templates/Effects/Fog.tscn" type="PackedScene" id=13]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+# Arbitrary change to test Git
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		# Stuff to do
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		global.set_save_data(self.name, {
+			\"dialogue_finished\": false,
+			\"current_position\": player.get_global_position()
+		})
+		# Stuff to do
+	
+	global.set_can_talk(true)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if $Effects.has_node(\"Particles\"): 
+		$Effects/Particles.emit_all()
+
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# Set the position of the player according to the last time 
+	# the player was in this scene
+	if (global.player_exit_points.has(self.name)):
+		player.global_position = global.player_exit_points[self.name].position
+		# Disable the exit node the player used previously
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = false
+		yield(get_tree().create_timer(2.5), \"timeout\")
+		get_node(global.player_exit_points[self.name].exit_node).monitoring = true
+	
+	player.talk()
+	yield(global, \"dialogue_finished\")
+	yield(get_tree().create_timer(1.0), \"timeout\")
+	$Transition.fade_in(2.0, \"Car1\")
+	yield(get_tree().create_timer(4.5), \"timeout\")
+	$Transition.fade_in(2.0, \"Car2\")
+	yield(get_tree().create_timer(4.5), \"timeout\")
+	$Transition.fade_in(1.5)
+	change_scene(\"res://src/Scenes/testing/Intro/NewDay1/Delivery.tscn\")
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="Environment" id=2]
+background_mode = 4
+glow_bloom = 0.06
+
+[node name="Intro" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 1 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, 3497.16, 5917.76, 3512.27, 5921.29, 6.64367, 5787.4, 23.3807, 5779.03, 3195.05, 0, 3255.48, 0, 0, -128, 0 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 2 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 4 )]
+position = Vector2( 719.198, -429.7 )
+interaction_script = "res://assets/dialogues/intro/new_intro/Intro.json"
+
+[node name="Sprite" parent="Characters/Evan" index="2"]
+frame = 0
+
+[node name="TemplateCharacter" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 1140.58, 765.687 )
+
+[node name="TemplateCharacter4" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 1140.58, 765.687 )
+
+[node name="TemplateCharacter5" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 1140.58, 765.687 )
+
+[node name="TemplateCharacter6" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 971.892, 859.552 )
+
+[node name="TemplateCharacter2" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 1272.36, 931.548 )
+
+[node name="TemplateCharacter3" parent="Characters" instance=ExtResource( 10 )]
+position = Vector2( 1111.66, 922.488 )
+rotation = 0.359011
+scale = Vector2( 1.0775, 3.04234 )
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 6 )]
+
+[node name="Transition" type="Node2D" parent="."]
+light_mask = 0
+z_index = 1000
+z_as_relative = false
+script = ExtResource( 2 )
+
+[node name="Car1" type="Sprite" parent="Transition"]
+visible = false
+modulate = Color( 1, 1, 1, 0 )
+texture = ExtResource( 12 )
+centered = false
+
+[node name="Car2" type="Sprite" parent="Transition"]
+modulate = Color( 1, 1, 1, 0 )
+texture = ExtResource( 11 )
+centered = false
+
+[node name="Moonlight" parent="Transition" instance=ExtResource( 7 )]
+energy = 0.9
+
+[node name="Light2D" parent="Transition" instance=ExtResource( 8 )]
+position = Vector2( 1488.28, 920.153 )
+texture_scale = 0.9
+color = Color( 0.968627, 0.909804, 0.0352941, 1 )
+
+[node name="MoonlightParticle" parent="Transition" instance=ExtResource( 9 )]
+
+[node name="Fog" parent="Transition" instance=ExtResource( 13 )]
+self_modulate = Color( 1, 1, 1, 0.0941176 )
+position = Vector2( 688.793, 516.621 )
+z_as_relative = true
+
+[node name="Fog2" parent="Transition" instance=ExtResource( 13 )]
+position = Vector2( 1590.02, 467.818 )
+z_as_relative = true
+
+[node name="BlackScreen" type="Sprite" parent="Transition"]
+visible = false
+modulate = Color( 0, 0, 0, 1 )
+light_mask = 0
+position = Vector2( 904.716, 524.107 )
+scale = Vector2( 2508.56, 2830.28 )
+texture = ExtResource( 3 )
+
+[node name="FadeOut" type="Tween" parent="Transition"]
+playback_speed = 0.5
+playback/speed = 0.5
+
+[node name="FadeIn" type="Tween" parent="Transition"]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 5 )]
+color = Color( 0.0316162, 0.0564958, 0.144531, 1 )
+
+[editable path="Characters/Evan"]

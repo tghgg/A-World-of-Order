@@ -1,0 +1,219 @@
+[gd_scene load_steps=17 format=2]
+
+[ext_resource path="res://assets/textures/levels/final/day1/evan_s living room.png.png" type="Texture" id=1]
+[ext_resource path="res://src/Templates/ObjectWithDialogue.tscn" type="PackedScene" id=2]
+[ext_resource path="res://src/Templates/ExitNode.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/Templates/Player.tscn" type="PackedScene" id=4]
+[ext_resource path="res://src/Templates/CGHandler.tscn" type="PackedScene" id=5]
+[ext_resource path="res://src/Templates/CanvasTint.tscn" type="PackedScene" id=6]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=7]
+[ext_resource path="res://src/Templates/InteractableArea.tscn" type="PackedScene" id=8]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+export (bool) var is_top_down := true
+
+onready var player := get_node(\"Characters/%s\" % global.current_player_name)
+onready var UI := player.get_node(\"Camera2D/UI\")
+
+# Set up the scene
+func _ready() -> void:
+	# Reset the reference to camera for the MSG_Parser 
+	MSG.camera = get_node('Characters/%s/Camera2D' % global.current_player_name)
+	
+	# Set global reference variables
+	global.set_current_scene(self.name)
+	
+	# Disable the tint momentarily
+	#$BG/Map/CanvasModulate/AnimationPlayer.play_backwards(\"set_tint\")
+	
+	# Fade in the scene
+	$Transition.visible = true
+	$Transition.fade_out()
+	
+	# Start emitting particles
+	if $Effects.has_node(\"Particles\"): 
+		$Effects/Particles.emit_all()
+	
+	# Play the level's theme
+	#GlobalMusicPlayer.set_music(\"res://assets/music/slow_low.ogg\")
+	
+	# SAVE DATA HANDLING HERE
+	# Usually will set up story stuff based on the save data
+	var save_data = global.get_save_data()
+	if save_data.has(self.name):
+		print(\"Loading from save\")
+		
+		if save_data[self.name].has(\"dialogue_finished\"):
+			if save_data[self.name][\"dialogue_finished\"]:
+				global.set_can_talk(true)
+		else:
+			global.set_can_talk(true)
+	
+		# Set the position of the player according to the last time 
+		# the player was in this scene
+		if save_data[self.name].has(\"exit_point\"):
+			# Set x and y separately because Vector2 is a Godot thing, not a JSON thing
+			player.global_position.x = save_data[self.name][\"exit_point\"][\"position_x\"]
+			player.global_position.y = save_data[self.name][\"exit_point\"][\"position_y\"]
+			# Disable the exit node the player used previously
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = false
+			yield(get_tree().create_timer(2.5), \"timeout\")
+			get_node(save_data[self.name][\"exit_point\"][\"exit_node\"]).monitoring = true
+	else: 
+		print(\"Creating new save entry for this level\")
+		# Update save data and autosave
+		UI.popup_element(\"SaveIndicator\", 3)
+		global.set_save_data(\"global\", {
+			\"current_scene\": self.filename
+		})
+		# Create the save entry for the level
+		global.set_save_data(self.name, {})
+		# Stuff to do
+		global.set_can_talk(true)
+		if player.interaction_script:
+			player.talk()
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene: String, time:=1.5, delay_between_scenes:=1.0) -> void:
+	global.set_can_talk(false)
+	$Transition.fade_in(time)
+	yield(get_tree().create_timer(time+delay_between_scenes), \"timeout\")
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 120.748, 239.324 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 180.744, 271.666 )
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 240.165, 438.54 )
+
+[sub_resource type="RectangleShape2D" id=5]
+extents = Vector2( 174.27, 361.468 )
+
+[sub_resource type="RectangleShape2D" id=6]
+extents = Vector2( 252.412, 973.935 )
+
+[sub_resource type="RectangleShape2D" id=7]
+extents = Vector2( 219.529, 586.584 )
+
+[sub_resource type="Environment" id=8]
+background_mode = 4
+glow_bloom = 0.06
+
+[node name="EvanLivingRoom" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="Map" type="Sprite" parent="BG"]
+texture = ExtResource( 1 )
+centered = false
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="Bounds" type="StaticBody2D" parent="BG/Map"]
+scale = Vector2( 0.333333, 0.333333 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( -660.371, 1803.7 )
+polygon = PoolVector2Array( 5069.77, -666.835, 5062.77, -428.902, 5227.22, -421.904, 5234.22, -145.482, 5055.77, -141.983, 5052.27, -12.5198, 5570.13, -23.0167, 5535.14, -684.33 )
+
+[node name="CollisionPolygon2D10" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( -651.779, 2967.88 )
+polygon = PoolVector2Array( 5069.77, -666.835, 5062.77, -428.902, 5227.22, -421.904, 5229.52, -204.741, 5050.83, -202.033, 5051.48, 14.7112, 5570.13, -23.0167, 5535.14, -684.33 )
+
+[node name="CollisionPolygon2D8" type="CollisionPolygon2D" parent="BG/Map/Bounds"]
+position = Vector2( 0, 1131.65 )
+polygon = PoolVector2Array( -128, -128, 5904.56, -127.253, 5904.56, -10.0933, -128, 0 )
+
+[node name="CollisionPolygon2D3" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2128.16, 1528.88 )
+shape = SubResource( 2 )
+
+[node name="CollisionPolygon2D9" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2984.42, 1755.62 )
+shape = SubResource( 3 )
+
+[node name="CollisionPolygon2D4" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2535.6, 1824.38 )
+shape = SubResource( 4 )
+
+[node name="CollisionPolygon2D7" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 4210.99, 2163.55 )
+shape = SubResource( 5 )
+
+[node name="CollisionPolygon2D5" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 1570.87, 2027.13 )
+shape = SubResource( 6 )
+
+[node name="t" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2330.36, 2786.62 )
+rotation = -1.57079
+shape = SubResource( 6 )
+
+[node name="t2" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 4527.56, 3202.12 )
+rotation = -1.57079
+shape = SubResource( 7 )
+
+[node name="t3" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 2772.46, 3208.77 )
+rotation = -1.57079
+shape = SubResource( 7 )
+
+[node name="t4" type="CollisionShape2D" parent="BG/Map/Bounds"]
+position = Vector2( 3703.19, 3454.75 )
+rotation = -1.57079
+shape = SubResource( 7 )
+
+[node name="ExitNode" parent="BG/Map" instance=ExtResource( 3 )]
+position = Vector2( 1212.28, 1069.09 )
+scale = Vector2( 1.30085, 1.08275 )
+exit_scene = "res://src/Scenes/Jam/Day1/ApartmentHallway.tscn"
+
+[node name="ExitNode2" parent="BG/Map" instance=ExtResource( 3 )]
+position = Vector2( 1530.49, 875.706 )
+rotation = -1.57079
+scale = Vector2( 0.850962, 0.922472 )
+exit_scene = "res://src/Scenes/Jam/Day1/EvanRoom.tscn"
+
+[node name="InteractableArea" parent="BG/Map" instance=ExtResource( 8 )]
+position = Vector2( 1577.26, 497.243 )
+scale = Vector2( 0.869112, 0.0936519 )
+interaction_script = "res://assets/dialogues/jam/day1/JustTheBathroom.json"
+
+[node name="InteractableObject" parent="BG/Map" instance=ExtResource( 2 )]
+position = Vector2( 522.569, 670.252 )
+interaction_script = "res://assets/dialogues/jam/day1/Wall-Section.json"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 8 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Evan" parent="Characters" instance=ExtResource( 4 )]
+position = Vector2( 1365.64, 836.048 )
+
+[node name="Sprite" parent="Characters/Evan" index="2"]
+frame = 0
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="CGHandler" parent="." instance=ExtResource( 5 )]
+
+[node name="Transition" parent="." instance=ExtResource( 7 )]
+
+[node name="CanvasModulate" parent="." instance=ExtResource( 6 )]
+visible = false
+color = Color( 0.0666667, 0.117647, 0.298039, 1 )
+
+[editable path="Characters/Evan"]

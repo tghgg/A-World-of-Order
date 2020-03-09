@@ -1,0 +1,226 @@
+[gd_scene load_steps=22 format=2]
+
+[ext_resource path="res://assets/textures/dialog_box.png" type="Texture" id=1]
+[ext_resource path="res://assets/characters/player/body_shape.tres" type="Shape2D" id=2]
+[ext_resource path="res://assets/characters/player/face.tres" type="SpriteFrames" id=3]
+[ext_resource path="res://src/Scripts/Player.gd" type="Script" id=4]
+[ext_resource path="res://assets/textures/bg.png" type="Texture" id=5]
+[ext_resource path="res://assets/characters/player/sprite.tres" type="SpriteFrames" id=6]
+[ext_resource path="res://icon.png" type="Texture" id=7]
+[ext_resource path="res://src/Templates/Transition.tscn" type="PackedScene" id=8]
+[ext_resource path="res://assets/textures/light/light.png" type="Texture" id=9]
+[ext_resource path="res://assets/textures/light/spot.png" type="Texture" id=10]
+[ext_resource path="res://assets/music/park.wav" type="AudioStream" id=11]
+
+[sub_resource type="GDScript" id=1]
+script/source = "extends Node2D
+
+onready var player_comes_out = \"res://Dialogues/Game/Player Comes Out.json\"
+onready var player = $Characters/Evan
+export (bool) var is_top_down = true
+onready var current_scene = self.name
+
+# Set up the scene
+func _ready():
+	print (current_scene)
+	$transition_node.visible = true
+	global.set_current_scene(current_scene)
+	global.set_can_talk(true)
+	$transition_node.fade_out()
+	player.talk()
+	yield(global, \"dialogue_finished\")
+	change_scene('res://Scenes/town_hall.tscn', 1.5)
+	# use this to replace conditional_branch and choices parsing 
+
+# Method for other nodes to use
+# Fade to black and freeze player input and movement
+func change_scene(scene, time):
+	global.set_can_talk(false)
+	$transition_node.fade_in(time)
+	yield(get_tree().create_timer(time), \"timeout\")
+	print('pause')
+	get_tree().change_scene(scene)
+"
+
+[sub_resource type="Environment" id=2]
+background_mode = 4
+glow_bloom = 0.06
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 9.69472, 13.1287 )
+
+[sub_resource type="RectangleShape2D" id=4]
+extents = Vector2( 9.69472, 8.68997 )
+
+[sub_resource type="GDScript" id=5]
+script/source = "extends \"res://Scripts/npc_script.gd\"
+
+"
+
+[sub_resource type="SpriteFrames" id=6]
+animations = [ {
+"frames": [ ExtResource( 7 ) ],
+"loop": true,
+"name": "default",
+"speed": 5.0
+} ]
+
+[sub_resource type="CapsuleShape2D" id=7]
+
+[sub_resource type="SpriteFrames" id=8]
+animations = [ {
+"frames": [ ExtResource( 7 ), ExtResource( 1 ), ExtResource( 5 ) ],
+"loop": true,
+"name": "default",
+"speed": 5.0
+} ]
+
+[sub_resource type="Animation" id=9]
+length = 10.0
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 5 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ Vector2( 568.003, 293.229 ), Vector2( 961.815, 293.229 ) ]
+}
+
+[sub_resource type="CapsuleShape2D" id=10]
+radius = 22.4616
+height = 26.5987
+
+[node name="Scene" type="Node2D" groups=[
+"level_root",
+]]
+script = SubResource( 1 )
+
+[node name="BG" type="Node2D" parent="."]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BG"]
+environment = SubResource( 2 )
+
+[node name="Ocean" type="StaticBody2D" parent="BG"]
+modulate = Color( 0.152941, 0.0627451, 0.811765, 1 )
+position = Vector2( 713.882, 743.438 )
+rotation = -3.14159
+scale = Vector2( 5.1927, -0.982744 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Ocean"]
+position = Vector2( 0, -87.6351 )
+scale = Vector2( 57.8097, 9.72447 )
+shape = SubResource( 3 )
+
+[node name="Sprite" type="Sprite" parent="BG/Ocean"]
+modulate = Color( 0.0745098, 0.027451, 0.670588, 0.941176 )
+position = Vector2( -48.963, 115.842 )
+rotation = 4.29717e-14
+scale = Vector2( 10.5825, 8.80484 )
+texture = ExtResource( 7 )
+
+[node name="Platform" type="StaticBody2D" parent="BG"]
+position = Vector2( 514.71, 495.964 )
+scale = Vector2( -5.1927, 0.982744 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BG/Platform"]
+scale = Vector2( 57.8097, 9.72447 )
+shape = SubResource( 4 )
+disabled = true
+
+[node name="Sprite" type="Sprite" parent="BG/Platform/CollisionShape2D"]
+modulate = Color( 0, 0, 0, 1 )
+scale = Vector2( 0.314826, 0.33318 )
+texture = ExtResource( 7 )
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="BG"]
+scroll_offset = Vector2( -0.03, 0 )
+
+[node name="Sprite" type="Sprite" parent="BG/ParallaxBackground"]
+position = Vector2( 960.593, 558.048 )
+scale = Vector2( 1.25667, 1.25667 )
+texture = ExtResource( 5 )
+
+[node name="Light2D" type="Light2D" parent="BG"]
+position = Vector2( 1060.8, 843.993 )
+texture = ExtResource( 9 )
+texture_scale = 1.52
+color = Color( 0.823529, 0.803922, 0.239216, 1 )
+energy = 1.4
+
+[node name="Sprite" type="Sprite" parent="BG/Light2D"]
+visible = false
+texture = ExtResource( 10 )
+
+[node name="CanvasModulate" type="CanvasModulate" parent="BG"]
+color = Color( 0.12549, 0.141176, 0.368627, 1 )
+
+[node name="Characters" type="Node2D" parent="."]
+
+[node name="Helen" type="KinematicBody2D" parent="Characters"]
+position = Vector2( 1248, 281.039 )
+scale = Vector2( 6.03209, 6.03209 )
+script = SubResource( 5 )
+interaction_script = "res://Dialogues/Neighbor-Chat.json"
+
+[node name="sprite" type="AnimatedSprite" parent="Characters/Helen"]
+frames = SubResource( 6 )
+
+[node name="body_shape" type="CollisionShape2D" parent="Characters/Helen"]
+shape = SubResource( 7 )
+disabled = true
+
+[node name="interactable_area" type="Area2D" parent="Characters/Helen"]
+scale = Vector2( 2.73996, 2.46791 )
+monitoring = false
+monitorable = false
+
+[node name="interactable_shape" type="CollisionShape2D" parent="Characters/Helen/interactable_area"]
+scale = Vector2( 2.41862, -1.36485 )
+shape = SubResource( 7 )
+
+[node name="face" type="AnimatedSprite" parent="Characters/Helen"]
+visible = false
+frames = SubResource( 8 )
+
+[node name="movement_handler" type="AnimationPlayer" parent="Characters/Helen"]
+anims/walk = SubResource( 9 )
+
+[node name="Evan" type="KinematicBody2D" parent="Characters"]
+position = Vector2( 800.034, 307.341 )
+scale = Vector2( 11.5331, 11.5331 )
+script = ExtResource( 4 )
+interaction_script = "res://Dialogues/Park-Chat.json"
+
+[node name="sprite" type="AnimatedSprite" parent="Characters/Evan"]
+frames = ExtResource( 6 )
+frame = 1
+playing = true
+
+[node name="body_shape" type="CollisionShape2D" parent="Characters/Evan"]
+position = Vector2( 0, 6.51347 )
+shape = ExtResource( 2 )
+
+[node name="interactable_area" type="Area2D" parent="Characters/Evan"]
+
+[node name="interactable_shape" type="CollisionShape2D" parent="Characters/Evan/interactable_area"]
+shape = SubResource( 10 )
+
+[node name="face" type="AnimatedSprite" parent="Characters/Evan"]
+visible = false
+frames = ExtResource( 3 )
+
+[node name="Camera2D" type="Camera2D" parent="Characters/Evan"]
+position = Vector2( 13.936, 20.1891 )
+current = true
+smoothing_enabled = true
+smoothing_speed = 2.0
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 11 )
+autoplay = true
+
+[node name="transition_node" parent="." instance=ExtResource( 8 )]

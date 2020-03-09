@@ -1,3 +1,4 @@
+![banner](banner.png)
 # A World of Order
 This repository contains the scripts, templates, scenes in Godot Engine 3.2 used to create the game [A World of Order](https://choppa2.itch.io/awoo).
 
